@@ -4,6 +4,31 @@ A local workspace for building a small language model, from requirements to pre-
 
 React + TypeScript frontend, Python/FastAPI backend, and **PostgreSQL project storage**. Overview, Project Setup, and Environment are implemented. Datasets and training execution are later milestones.
 
+## UI screenshots
+
+### Overview
+
+Project dashboard with scope readiness and the training roadmap.
+
+![Pre-training Studio overview with PostgreSQL project storage](artifacts/overview-postgres.png)
+
+### Environment
+
+Real backend-host checks for Python, PyTorch/CUDA, NVIDIA drivers, RAM and disk. Results reflect the machine and packages available when the screenshot was captured.
+
+<details>
+<summary>View the desktop Environment screen</summary>
+
+![Desktop Environment screen with hardware checks and package status](artifacts/environment-desktop.png)
+
+</details>
+
+### Mobile layouts
+
+| Project Setup | Environment |
+| --- | --- |
+| <img src="artifacts/setup-postgres-mobile.png" alt="Mobile Project Setup form with PostgreSQL storage" width="280" /> | <img src="artifacts/environment-mobile.png" alt="Mobile Environment screen with system checks" width="280" /> |
+
 ## Run everything
 
 Prerequisites: Python 3.11+ with `venv`/`ensurepip`, Node.js 22.12+ (22.x) or 24.x, npm, and Docker with Compose. Verified on Linux with Python 3.14 and Node 24.
@@ -105,6 +130,7 @@ SQL migrations are in `backend/migrations/`. Each migration is recorded transact
 ## Plans and verification
 
 - [Full training roadmap](MODEL_TRAINING_PLAN.md)
+- [Remaining work and lightweight-first roadmap](REMAINING_WORK_PLAN.md)
 - [Step 1 UI plan](STEP_1_UI_PLAN.md)
 - [Step 2 implementation notes](STEP_2_BACKEND_PLAN.md)
 - [Step 2 verification](artifacts/STEP_2_VERIFICATION.md)
