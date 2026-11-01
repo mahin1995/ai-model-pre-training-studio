@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+__pycache__/
+.venv/
+data/
+checkpoints/
+logs/
+.pytest_cache/
+*.pyc
