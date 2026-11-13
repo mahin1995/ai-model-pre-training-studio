@@ -16,15 +16,19 @@ from .config import ROOT, database_url
 from .database import make_pool, migrate
 from .environment import inspect_environment
 from .schemas import Project
+from .datasets.router import router as datasets_router, UploadBodyLimit
+from .datasets.worker import DatasetWorker
+from .datasets.review_router import router as review_router
 
 # Pool messages may include connection details; return actionable generic errors instead.
 logging.getLogger("psycopg.pool").setLevel(logging.CRITICAL)
 
 
-def create_app(url: str | None = None) -> FastAPI:
+def create_app(url: str | None = None, *, enable_worker: bool = True) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        pool = make_pool(url or database_url())
+        connection_url = url or database_url()
+        pool = make_pool(connection_url)
         app.state.pool = pool
         try:
             pool.open(wait=True, timeout=12)
@@ -32,12 +36,21 @@ def create_app(url: str | None = None) -> FastAPI:
         except Exception:
             pool.close()
             raise RuntimeError("PostgreSQL startup failed. Check your .env connection settings and database availability.") from None
+        app.state.data_root = Path(os.getenv("STUDIO_DATA_DIR", str(ROOT / "data"))).expanduser().resolve()
+        worker = DatasetWorker(connection_url, app.state.data_root)
+        if enable_worker:
+            worker.start()
         try:
             yield
         finally:
+            if enable_worker:
+                worker.stop()
             pool.close()
 
-    app = FastAPI(title="Pre-training Studio API", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="Pre-training Studio API", version="0.3.0", lifespan=lifespan)
+    app.add_middleware(UploadBodyLimit)
+    app.include_router(datasets_router)
+    app.include_router(review_router)
 
     @app.middleware("http")
     async def local_origins(request: Request, call_next):

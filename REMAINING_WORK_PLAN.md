@@ -1,6 +1,6 @@
 # Pre-training Studio — Progress ebong Remaining Work
 
-Updated: 2026-11-01 (Asia/Dhaka)
+Updated: 2026-11-09 (Asia/Dhaka)
 
 ## 1. Agreed working order
 
@@ -8,7 +8,7 @@ Age app-er UI, configuration, PostgreSQL metadata ebong choto sample diye testab
 
 Dataset import, preview, basic cleaning, exact deduplication ebong document-level split-er jonno PyTorch lagbe na. Tokenizer-er small-sample test-o PyTorch chara kora jay. Boro dataset processing/tokenizer training CPU, RAM ebong disk-er upor heavy hote pare; tai prothome bounded sample use korbo.
 
-**Next implementation: Datasets screen + backend.** Ei document planning/progress artifact; notun dataset/training feature ekhono implement kora hoyni.
+**Next implementation: Tokenizer screen + small-sample pipeline (M4).** M3 Datasets implemented; details `STEP_3_DATASETS_PLAN.md` ebong `artifacts/STEP_3_VERIFICATION.md`-e ache.
 
 ## 2. Ekhon porjonto complete
 
@@ -22,37 +22,38 @@ Dataset import, preview, basic cleaning, exact deduplication ebong document-leve
 | PostgreSQL storage | Project create/list/read/update, SQL migrations, persistent Docker volume | Complete |
 | Save reliability | Server timestamps/revisions, concurrent-edit conflict detection | Complete |
 | Project selection/import | Saved project switching, explicit legacy browser-draft import | Complete |
+| Datasets | TXT/JSONL import, preview, cleaning/deduplication, grouped splits, jobs and immutable version downloads | Complete |
 | Environment screen | Python, packages, PyTorch/CUDA probe, NVIDIA driver, RAM/disk results | Complete |
 | Local launcher | `.venv` setup, dependencies, PostgreSQL + Python + React launch | Complete |
 | Production serving path | Built React frontend ebong API same Python server theke serve | Verified locally |
 
-Environment screen complete mane training environment ready na. Last verified setup-e GPU driver RTX 3060 / 12 GB VRAM report korechilo; backend `.venv`-e PyTorch ebong core training libraries install kora hoyni. Actual dataset, tokenizer, model checkpoint ba training run ekhono nei.
+Environment screen complete mane training environment ready na. Last verified setup-e GPU driver RTX 3060 / 12 GB VRAM report korechilo; backend `.venv`-e PyTorch ebong core training libraries install kora hoyni. Datasets import/processing feature ready; user-er actual training corpus selection/import ekhono korte hobe. Final tokenizer, model checkpoint ba training run ekhono nei.
 
-Previous verification: 13 frontend tests + 9 backend tests pass; production build, real PostgreSQL stop/start persistence ebong checked browser flows pass. Details: [Step 2 verification](artifacts/STEP_2_VERIFICATION.md).
+Latest Step 3 verification: 17 frontend tests + 28 backend tests pass; details `artifacts/STEP_3_VERIFICATION.md`. Previous Step 2 verification: 13 frontend tests + 9 backend tests pass; production build, real PostgreSQL stop/start persistence ebong checked browser flows pass. Details: [Step 2 verification](artifacts/STEP_2_VERIFICATION.md).
 
 ## 3. Kototuku baki?
 
 - Initial app foundation ebong project/environment management complete.
-- Nicher revised roadmap-e **9-ti milestone baki**: 5-ti feature-building milestone, tarpor 4-ti heavier execution milestone.
-- Datasets, Tokenizer, Model Config, Pre-training, Evaluation, Fine-tuning ebong Playground-er functional workflows baki. Existing sidebar entries sudhu planned placeholders.
+- Nicher revised roadmap-e **8-ti milestone baki**: 4-ti feature-building milestone, tarpor 4-ti heavier execution milestone. M3 Datasets complete.
+- Tokenizer, Model Config, Pre-training, Evaluation, Fine-tuning ebong Playground-er functional workflows baki. Oi sidebar entries ekhono planned placeholders; Datasets ekhon functional.
 - **Actual model training ekhono shuru hoyni.** Training project-er scope, data sources, permission ebong acceptance criteria user-keo fill/confirm korte hobe; UI complete howa diye ei decisions automatically complete hoy na.
 - Time/effort-er percentage ekhon reliable na: dataset size, final model size ebong pilot throughput jana nei. Milestone count-ke elapsed-time ba total-effort percentage hisebe dhorbo na.
 
 ## 4. Phase A — Age lightweight feature development
 
-### M3 — Datasets screen + backend (next)
+### M3 — Datasets screen + backend (complete: 2026-11-09)
 
-- [ ] Project-er shathe linked dataset records ebong PostgreSQL migration.
-- [ ] Local TXT/JSONL import; supported encoding/format ebong size limits clear kora.
-- [ ] Uploaded/raw files configured local data directory-te rakha; PostgreSQL-e metadata, source provenance, file references ebong processing status rakha.
-- [ ] Raw data preserve kora; cleaning diye original file overwrite na kora.
-- [ ] Bounded preview, record counts ebong sample quality inspection.
-- [ ] Empty record, unwanted markup, whitespace ebong Unicode cleaning-er configurable rules.
-- [ ] Small sample-e exact deduplication ebong before/after summary.
-- [ ] Document/source group dhore deterministic train/validation/test split; tokenization/chunking-er age split.
-- [ ] Source/license/permission metadata link kora; sensitive data manually review korar workflow.
-- [ ] Processing status, errors ebong output manifest dekhano; long task request-er moddhe block na kora.
-- [ ] Import, cleaning, reproducible split ebong UI/backend integration verify kora.
+- [x] Project-er shathe linked dataset records ebong PostgreSQL migration.
+- [x] Local TXT/JSONL import; supported encoding/format ebong size limits clear kora.
+- [x] Uploaded/raw files configured local data directory-te rakha; PostgreSQL-e metadata, source provenance, file references ebong processing status rakha.
+- [x] Raw data preserve kora; cleaning diye original file overwrite na kora.
+- [x] Bounded preview, record counts ebong sample quality inspection.
+- [x] Empty record, unwanted markup, whitespace ebong Unicode cleaning-er configurable rules.
+- [x] Small sample-e exact deduplication ebong before/after summary.
+- [x] Document/source group dhore deterministic train/validation/test split; tokenization/chunking-er age split.
+- [x] Source/license/permission metadata link kora; sensitive data manually review korar workflow.
+- [x] Processing status, errors ebong output manifest dekhano; long task request-er moddhe block na kora.
+- [x] Import, cleaning, reproducible split ebong UI/backend integration verify kora.
 
 **Done when:** Choto real sample import → preview → clean/deduplicate → split kora jay; raw files intact thake ebong reload-er por metadata/output references fire pawa jay.
 
@@ -163,7 +164,7 @@ Previous verification: 13 frontend tests + 9 backend tests pass; production buil
 ```text
 Completed: App foundation + Project Setup + PostgreSQL + Environment inspection
     ↓
-M3 Datasets (small samples)
+M3 Datasets (small samples — COMPLETE)
     ↓
 M4 Tokenizer (small-sample test)
     ↓
@@ -192,8 +193,8 @@ Prottek milestone complete hole ei file-e corresponding checklist ebong completi
 | --- | --- |
 | Initial UI foundation (Step 1) | Complete |
 | FastAPI/PostgreSQL/Environment (Step 2) | Complete |
-| M3 Datasets | Not started — next |
-| M4 Tokenizer | Not started |
+| M3 Datasets | Complete — small-sample pipeline verified |
+| M4 Tokenizer | Not started — next |
 | M5 Model Config | Not started |
 | M6 Training/job infrastructure | Not started |
 | M7 Evaluation/Playground preparation | Not started |
@@ -201,3 +202,7 @@ Prottek milestone complete hole ei file-e corresponding checklist ebong completi
 | M9 Model smoke test | Not started |
 | M10 Pre-training/base evaluation | Not started |
 | M11 Fine-tuning/final inference | Not started |
+
+## 8. Completion log
+
+2026-11-09: M3 Datasets complete. TXT/JSONL import, bounded preview, source permission editing/gate, cleaning, exact deduplication, leakage-resistant splits, PostgreSQL jobs/cancellation/recovery, immutable version downloads ebong checked browser flow verified. Large-corpus execution remains deferred. See `artifacts/STEP_3_VERIFICATION.md`.

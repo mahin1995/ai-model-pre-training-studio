@@ -37,6 +37,7 @@ import { readiness, validate } from "./features/project-setup/validation";
 import { listProjects, loadProject, saveProject } from "./services/projects";
 import { loadProject as loadLegacyProject } from "./services/legacy-project";
 import { Environment } from "./components/Environment";
+import { Datasets } from "./components/Datasets";
 const nav: { name: string; icon: LucideIcon }[] = [
   { name: "Overview", icon: LayoutDashboard },
   { name: "Project Setup", icon: Settings2 },
@@ -414,7 +415,7 @@ export default function App() {
             >
               <Icon size={18} />
               <span>{name}</span>
-              {index > 2 && <span className="nav-planned">Soon</span>}
+              {index > 3 && <span className="nav-planned">Soon</span>}
               {page === name && <span className="active-dot" />}
             </button>
           ))}
@@ -585,7 +586,9 @@ export default function App() {
                         ? "Define what you’re building, what you have, and what success looks like."
                         : page === "Environment"
                           ? "Verify your Python environment and inspect the resources on your backend host."
-                          : "One step at a time. This part of your model journey is coming next."}
+                          : page === "Datasets"
+                            ? "Build a clean, reproducible text dataset, one small sample at a time."
+                            : "One step at a time. This part of your model journey is coming next."}
                   </p>
                 </div>
                 {page === "Overview" && p && (
@@ -1505,6 +1508,11 @@ export default function App() {
                 <Environment
                   project={p}
                   onApply={(hardware) => update({ hardware })}
+                  onSetup={() => navigate("Project Setup")}
+                />
+              ) : page === "Datasets" ? (
+                <Datasets
+                  project={p}
                   onSetup={() => navigate("Project Setup")}
                 />
               ) : (

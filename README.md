@@ -2,7 +2,7 @@
 
 A local workspace for building a small language model, from requirements to pre-training and fine-tuning.
 
-React + TypeScript frontend, Python/FastAPI backend, and **PostgreSQL project storage**. Overview, Project Setup, and Environment are implemented. Datasets and training execution are later milestones.
+React + TypeScript frontend, Python/FastAPI backend, and **PostgreSQL project storage**. Overview, Project Setup, Environment, and the small-data Datasets pipeline are implemented. Tokenizer/model training remain later milestones.
 
 ## UI screenshots
 
@@ -25,9 +25,32 @@ Real backend-host checks for Python, PyTorch/CUDA, NVIDIA drivers, RAM and disk.
 
 ### Mobile layouts
 
-| Project Setup | Environment |
-| --- | --- |
+| Project Setup                                                                                                         | Environment                                                                                                   |
+| --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | <img src="artifacts/setup-postgres-mobile.png" alt="Mobile Project Setup form with PostgreSQL storage" width="280" /> | <img src="artifacts/environment-mobile.png" alt="Mobile Environment screen with system checks" width="280" /> |
+
+### Datasets
+
+Import and inspect raw text, review cleaning settings, then download versioned train/validation/test splits.
+
+![Datasets library with imported corpus and version status](artifacts/datasets-library-desktop.png)
+
+<details>
+<summary>View dataset import, preview and processing screens</summary>
+
+![TXT and JSONL dataset import form](artifacts/datasets-import-desktop.png)
+
+![Raw dataset preview with pagination](artifacts/datasets-preview-desktop.png)
+
+![Cleaning, grouping and split settings review](artifacts/datasets-processing-desktop.png)
+
+![Completed dataset version with split counts and downloads](artifacts/datasets-splits-desktop.png)
+
+</details>
+
+| Mobile dataset overview                                                                                                     | Mobile prepared splits                                                                                           |
+| --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| <img src="artifacts/datasets-overview-mobile.png" alt="Dataset source metadata and original files on mobile" width="280" /> | <img src="artifacts/datasets-splits-mobile.png" alt="Versioned dataset split downloads on mobile" width="280" /> |
 
 ## Run everything
 
@@ -91,7 +114,7 @@ Open http://127.0.0.1:8000 after restarting the backend with a build present. Ha
 - The server sets timestamps and revisions. Concurrent edits return a conflict instead of silently overwriting another tab's saved changes. Reload before retrying a conflict; unsaved edits remain open until discarded.
 - Saves wait for server confirmation. Connection/database errors are visible and keep edits in the form. Unsaved edits are in memory until saved; they are not an offline backup.
 - Legacy Step 1 browser drafts can be explicitly imported as a new project and saved to PostgreSQL. The original browser draft stays untouched. Open the same browser origin used in Step 1 to see that draft.
-- Source fields store metadata only. No dataset contents, secrets, GPU installation or training run is created by this milestone.
+- Project Setup source fields hold planning metadata. Datasets stores uploaded raw files and prepared versions on local disk, with PostgreSQL metadata. Training is not started by data processing.
 
 ## Environment checks
 
@@ -105,6 +128,37 @@ Open **Environment → Run environment checks**. The backend checks:
 Results describe the **backend host**, not the browser device or a remote cloud training machine. Missing packages, CPU-only PyTorch, timeouts, and unavailable disk paths are reported with next actions. PyTorch and training libraries are intentionally not installed by the app setup: choose a hardware-compatible build separately using the official PyTorch installer. Install training packages into the same `.venv` that runs the backend.
 
 You can explicitly copy PyTorch-visible GPU details, RAM and free disk to a local project draft, then review/save it. This is disabled for cloud projects and when GPU visibility is unverified. Heterogeneous GPU memory uses the smallest detected VRAM value. Checks do not run a forward/backward pass, estimate model capacity, or guarantee training readiness.
+
+## Datasets: prepare a small sample
+
+1. Save a project, open **Datasets**, and choose **Import dataset**.
+2. Enter its name, language, source, license/permission note and permission status. Upload UTF-8 TXT/JSONL or text-based PDF files.
+3. Inspect **Overview** and **Preview**. Raw files remain intact; previews show up to 20 records per page and truncate long text at 4,000 characters. Downloads retain full text.
+4. Confirm source usage permission in Overview and save metadata. Confirmation is required before processing. Active jobs lock metadata edits; past versions retain their original metadata snapshot.
+5. In **Processing**, choose cleanup, deduplication, grouping, split percentages and seed. Review the summary, then start processing. Status updates every two seconds; cancellation and retry are available.
+6. In **Splits**, select a successful version and download JSONL splits, all processed records or the manifest. Reloading restores dataset/version records from PostgreSQL.
+7. To remove an accidental duplicate, open that dataset and choose **Delete upload**, then confirm. This permanently removes only that imported dataset, its processing history and saved versions; your original file and separately imported copies remain. Cancel or finish active processing first.
+
+Limits per import: **20 files, 20 MiB total, 10,000 documents**. A TXT file is one document; each non-empty JSONL line is one record. Each TXT document/JSONL line is limited to 1 MiB. Unsupported formats/encoding and invalid records are rejected with file/line errors. Use a small sample first; this version does not download remote datasets.
+
+**PDF import:** Selectable text is extracted page by page (maximum 1,000 pages, 1 MiB extracted text per page and 20 MiB extracted text per PDF). Original PDFs are preserved. Each text page becomes a record with its original page number; all pages of the same PDF are grouped together to prevent train/validation/test leakage, including repeated uploads of identical PDF bytes. A single PDF defaults to 100/0/0 splits in the UI. Textless pages are skipped and listed in Overview. Fully scanned/image-only, password-protected and corrupt PDFs are rejected with actionable messages. OCR is not included; run OCR externally before importing scanned files. Review Preview for extraction quality, especially complex layouts and tables.
+
+TXT files may contain multi-line text and an optional UTF-8 BOM. JSONL requires a string `text`; optional `source`, `language` and `group_id` must also be strings:
+
+```jsonl
+{"text":"বাংলা শেখার প্রথম উদাহরণ।","source":"Books","language":"bn","group_id":"book-1"}
+{"text":"একই বইয়ের আরেকটি অংশ।","source":"Books","language":"bn","group_id":"book-1"}
+{"text":"দ্বিতীয় বইয়ের উদাহরণ।","source":"Books","language":"bn","group_id":"book-2"}
+{"text":"তৃতীয় বইয়ের উদাহরণ।","source":"Books","language":"bn","group_id":"book-3"}
+```
+
+Missing record source/language inherits the import form values. Empty text records are counted at import and removed by default during cleaning. Unicode NFC, line-ending normalization, outer trimming, empty removal and exact deduplication default on. HTML/script/style removal and internal whitespace collapse default off. Bangla joiners and meaningful characters are preserved.
+
+The default split is **90/5/5**, seed **42**. Explicit `group_id` values and identical cleaned content stay in the same split, including when deduplication is off. Source grouping additionally keeps each source together. Deduplicated records keep the first document and merge provenance. Actual ratios may differ because whole groups stay intact. Each non-zero split needs at least one independent group; when only one group exists, choose 100/0/0 or add more independent groups. No tokenization is performed.
+
+Each successful run creates an immutable version with counts, source references, settings/seed and SHA-256 checksums. Failed/cancelled runs do not replace previous outputs. A PostgreSQL-backed worker starts with FastAPI and processes one job globally at a time. Jobs have heartbeat leases; interrupted running jobs are marked failed after a 60-second expired lease, and can be retried. Queued jobs survive restarts.
+
+Dataset storage defaults to `<repository>/data/datasets/`. Set `STUDIO_DATA_DIR` to choose the parent storage root; it must be accessible to the Python process. PostgreSQL stores references, not file contents: preserve this directory together with database backups. Raw files use generated IDs rather than client filenames. The app does not expose arbitrary local paths or ingest a server path provided by the browser.
 
 ## Verify
 
@@ -127,6 +181,16 @@ SQL migrations are in `backend/migrations/`. Each migration is recorded transact
 - `PATCH /api/projects/{id}` — submit the full edited project with its current revision; returns the next revision.
 - `GET /api/environment` — run read-only host checks (may take up to about 30 seconds).
 
+Dataset endpoints (prefix `/api/projects/{project_id}/datasets`):
+
+- `GET /` and `POST /` — list datasets / multipart import (`metadata` JSON field plus repeated `files`). Use the prefix without a trailing slash.
+- `GET /{dataset_id}` and `PATCH /{dataset_id}` — detail / update dataset metadata and source permission.
+- `DELETE /{dataset_id}` — delete the selected imported dataset, its jobs, versions and stored files; returns 409 while processing is queued or running.
+- `GET /{dataset_id}/preview` — `page`, `page_size` (max 20), optional `version_id` and `split` (`processed`, `train`, `validation`, `test`).
+- `POST /{dataset_id}/process` — queue processing settings; returns 202 with a job ID.
+- `GET /{dataset_id}/jobs/{job_id}` and `POST /{dataset_id}/jobs/{job_id}/cancel` — status / cancellation.
+- `GET /{dataset_id}/versions/{version_id}/download?artifact=manifest` — choose `manifest`, `processed`, `train`, `validation` or `test`.
+
 ## Plans and verification
 
 - [Full training roadmap](MODEL_TRAINING_PLAN.md)
@@ -134,4 +198,6 @@ SQL migrations are in `backend/migrations/`. Each migration is recorded transact
 - [Step 1 UI plan](STEP_1_UI_PLAN.md)
 - [Step 2 implementation notes](STEP_2_BACKEND_PLAN.md)
 - [Step 2 verification](artifacts/STEP_2_VERIFICATION.md)
+- [Step 3 datasets implementation](STEP_3_DATASETS_PLAN.md)
+- [Step 3 verification](artifacts/STEP_3_VERIFICATION.md)
 - [Verification artifacts](artifacts/)

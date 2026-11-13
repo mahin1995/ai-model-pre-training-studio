@@ -2,11 +2,14 @@ export async function request<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
+  const headers = new Headers(init.headers);
+  if (!(init.body instanceof FormData) && !headers.has("Content-Type"))
+    headers.set("Content-Type", "application/json");
   let response: Response;
   try {
     response = await fetch(`/api${path}`, {
       ...init,
-      headers: { "Content-Type": "application/json", ...init.headers },
+      headers,
       signal: init.signal ?? AbortSignal.timeout(35000),
     });
   } catch (error) {
