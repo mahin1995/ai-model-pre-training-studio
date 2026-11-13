@@ -35,6 +35,7 @@ def job_json(row):
     if not row:
         return None
     return {"id": str(row["id"]), "datasetId": str(row["dataset_id"]), "settings": row["settings"],
+            "correctionParentVersionId": (row.get("correction_input") or {}).get("baseVersionId"),
             "status": row["status"], "progress": row["progress"], "cancelRequested": row["cancel_requested"],
             "error": row["error"], "resultVersionId": str(row["result_version_id"]) if row["result_version_id"] else None,
             "createdAt": row["created_at"].isoformat(), "finishedAt": row["finished_at"].isoformat() if row["finished_at"] else None}

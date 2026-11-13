@@ -1,6 +1,6 @@
 # Pre-training Studio — Progress ebong Remaining Work
 
-Updated: 2026-11-09 (Asia/Dhaka)
+Updated: 2026-11-14 (Asia/Dhaka)
 
 ## 1. Agreed working order
 
@@ -9,6 +9,8 @@ Age app-er UI, configuration, PostgreSQL metadata ebong choto sample diye testab
 Dataset import, preview, basic cleaning, exact deduplication ebong document-level split-er jonno PyTorch lagbe na. Tokenizer-er small-sample test-o PyTorch chara kora jay. Boro dataset processing/tokenizer training CPU, RAM ebong disk-er upor heavy hote pare; tai prothome bounded sample use korbo.
 
 **Next implementation: Tokenizer screen + small-sample pipeline (M4).** M3 Datasets implemented; details `STEP_3_DATASETS_PLAN.md` ebong `artifacts/STEP_3_VERIFICATION.md`-e ache.
+
+M3 follow-up: PDF import, duplicate-upload deletion and **Review & Correct** are implemented. Version-scoped drafts support source-page comparison, explicit Bangla suggestions, manual table/text correction, revision conflicts and reviewed version publication with audit/continuous-text exports. This makes correction tooling available; the user's actual corpus still needs page-by-page review before publishing its corrected version. See `artifacts/DATASET_REVIEW_VERIFICATION.md`.
 
 ## 2. Ekhon porjonto complete
 
@@ -22,14 +24,14 @@ Dataset import, preview, basic cleaning, exact deduplication ebong document-leve
 | PostgreSQL storage | Project create/list/read/update, SQL migrations, persistent Docker volume | Complete |
 | Save reliability | Server timestamps/revisions, concurrent-edit conflict detection | Complete |
 | Project selection/import | Saved project switching, explicit legacy browser-draft import | Complete |
-| Datasets | TXT/JSONL import, preview, cleaning/deduplication, grouped splits, jobs and immutable version downloads | Complete |
+| Datasets | TXT/JSONL/PDF import, preview, cleaning/deduplication, grouped splits, upload deletion, reviewed corrections and immutable version downloads | Complete |
 | Environment screen | Python, packages, PyTorch/CUDA probe, NVIDIA driver, RAM/disk results | Complete |
 | Local launcher | `.venv` setup, dependencies, PostgreSQL + Python + React launch | Complete |
 | Production serving path | Built React frontend ebong API same Python server theke serve | Verified locally |
 
 Environment screen complete mane training environment ready na. Last verified setup-e GPU driver RTX 3060 / 12 GB VRAM report korechilo; backend `.venv`-e PyTorch ebong core training libraries install kora hoyni. Datasets import/processing feature ready; user-er actual training corpus selection/import ekhono korte hobe. Final tokenizer, model checkpoint ba training run ekhono nei.
 
-Latest Step 3 verification: 17 frontend tests + 28 backend tests pass; details `artifacts/STEP_3_VERIFICATION.md`. Previous Step 2 verification: 13 frontend tests + 9 backend tests pass; production build, real PostgreSQL stop/start persistence ebong checked browser flows pass. Details: [Step 2 verification](artifacts/STEP_2_VERIFICATION.md).
+Latest verification (2026-11-14): 22 frontend tests + 52 backend tests pass, production build passes, and the reviewed correction workflow passes in desktop/mobile browser checks. Details: `artifacts/DATASET_REVIEW_VERIFICATION.md`. Original Step 3 verification is in `artifacts/STEP_3_VERIFICATION.md`; Step 2 verification is in `artifacts/STEP_2_VERIFICATION.md`.
 
 ## 3. Kototuku baki?
 
@@ -204,5 +206,7 @@ Prottek milestone complete hole ei file-e corresponding checklist ebong completi
 | M11 Fine-tuning/final inference | Not started |
 
 ## 8. Completion log
+
+2026-11-14: Review & Correct workflow verified using an isolated PostgreSQL database and generated PDF fixture: save/reload, page review, Version 2 publication, unchanged parent artifacts, derived export checksums and responsive browser flow. The live uploaded PDF is preserved; no actual corpus was automatically marked reviewed. Tokenizer/model training remain unimplemented.
 
 2026-11-09: M3 Datasets complete. TXT/JSONL import, bounded preview, source permission editing/gate, cleaning, exact deduplication, leakage-resistant splits, PostgreSQL jobs/cancellation/recovery, immutable version downloads ebong checked browser flow verified. Large-corpus execution remains deferred. See `artifacts/STEP_3_VERIFICATION.md`.

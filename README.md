@@ -160,6 +160,20 @@ Each successful run creates an immutable version with counts, source references,
 
 Dataset storage defaults to `<repository>/data/datasets/`. Set `STUDIO_DATA_DIR` to choose the parent storage root; it must be accessible to the Python process. PostgreSQL stores references, not file contents: preserve this directory together with database backups. Raw files use generated IDs rather than client filenames. The app does not expose arbitrary local paths or ingest a server path provided by the browser.
 
+## Review and correct a saved dataset
+
+Open a dataset, then **Review & Correct**. Choose its saved parent version. Each record opens with its full text and, for PDFs, the original page image. Click the image to inspect it at full size. Correct broken Bangla words, line wrapping, table rows and clause references in the editor; the **Before** section preserves the parent text for comparison.
+
+Word suggestions are page-local and require explicit acceptance; they do not repair arbitrary Bengali glyph mappings. The optional spacing cleanup removes U+200B/BOM and normalizes NFC/line whitespace while preserving Bangla ZWJ/ZWNJ and paragraph breaks. Check suggestions against the PDF. Tables can be rewritten as labeled `Requirement`, `Clause`, `Meaning` lines without changing their facts.
+
+Use **Save draft** for unfinished work, or **Mark reviewed & next** after checking the page. Moving between records saves pending edits; changing parent versions or leaving the workspace requires saving or undoing edits first. Saved drafts survive refreshes and server restarts. Concurrent tabs use draft revisions: conflicts preserve editor text and require reloading the saved draft rather than overwriting it silently. Editing text resets its review flag.
+
+After all records are reviewed and saved, choose **Review publication → Create new corrected version**. A background job snapshots the draft and creates the next version; originals and previous versions stay intact. Editing is locked while processing is active. Cancelled/failed correction jobs can be retried from Review & Correct. Parent checksums are verified; duplicate corrected text crossing splits blocks publication.
+
+Corrected versions keep the same record IDs, provenance and split membership, including 100/0/0 for a single PDF. In **Splits**, download the corrected JSONL, manifest, before/after correction report, page-ordered documents (`documents.jsonl`, with source boundaries and split labels), or continuous **training-only** text. No tokenizer or model is trained here. The UI is a review tool: a user's actual corpus is not automatically marked reviewed or published.
+
+See [review workflow verification](artifacts/DATASET_REVIEW_VERIFICATION.md).
+
 ## Verify
 
 ```bash
@@ -190,6 +204,12 @@ Dataset endpoints (prefix `/api/projects/{project_id}/datasets`):
 - `POST /{dataset_id}/process` — queue processing settings; returns 202 with a job ID.
 - `GET /{dataset_id}/jobs/{job_id}` and `POST /{dataset_id}/jobs/{job_id}/cancel` — status / cancellation.
 - `GET /{dataset_id}/versions/{version_id}/download?artifact=manifest` — choose `manifest`, `processed`, `train`, `validation` or `test`.
+- `GET /{dataset_id}/versions/{version_id}/corrections?page=1` — full parent record, saved draft, review counts and source-image link.
+- `PUT /{dataset_id}/versions/{version_id}/corrections` — save `recordId`, `text`, `reviewed` and optimistic `revision`; stale drafts return 409.
+- `POST /{dataset_id}/versions/{version_id}/corrections/publish` — snapshot the supplied draft `revision`; all records must be reviewed. Returns a durable job.
+- `GET /{dataset_id}/files/{file_id}/pages/{page}/image` — render a bounded PNG of an imported PDF page.
+
+Corrected-version downloads additionally accept `continuous` (training-only TXT), `documents` (source-separated JSONL) and `corrections` (before/after JSON report).
 
 ## Plans and verification
 

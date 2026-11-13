@@ -79,6 +79,7 @@ export default function App() {
   const [menu, setMenu] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [datasetDirty, setDatasetDirty] = useState(false);
   const loadSequence = useRef(0);
   const dirty = JSON.stringify(project) !== savedJson;
   async function refreshProjects() {
@@ -156,6 +157,11 @@ export default function App() {
     const onRoute = () => {
       const target = pageFromHash();
       if (target === page) return;
+      if (datasetDirty) {
+        window.history.replaceState(null, "", routeFor(page));
+        setNotice("Save or undo your dataset correction draft before leaving.");
+        return;
+      }
       if (dirty) {
         window.history.replaceState(null, "", routeFor(page));
         setPending(target);
@@ -163,7 +169,7 @@ export default function App() {
     };
     window.addEventListener("hashchange", onRoute);
     return () => window.removeEventListener("hashchange", onRoute);
-  }, [page, dirty]);
+  }, [page, dirty, datasetDirty]);
   useEffect(() => {
     if (!menu) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -203,6 +209,7 @@ export default function App() {
   }
   function navigate(next: string) {
     if (saving) return;
+    if (datasetDirty) { setNotice("Save or undo your dataset correction draft before leaving."); return; }
     setMenu(false);
     if (next === page) return;
     if (dirty) setPending(next);
@@ -232,6 +239,7 @@ export default function App() {
   }
   function chooseProject(next: string) {
     if (saving) return;
+    if (datasetDirty) { setNotice("Save or undo your dataset correction draft before switching projects."); return; }
     if (dirty) setPending(next);
     else void applyNavigation(next);
   }
@@ -1514,6 +1522,7 @@ export default function App() {
                 <Datasets
                   project={p}
                   onSetup={() => navigate("Project Setup")}
+                  onDirtyChange={setDatasetDirty}
                 />
               ) : (
                 <section className="empty-card planned-page">

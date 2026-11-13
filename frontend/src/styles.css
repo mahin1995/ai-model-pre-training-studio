@@ -2088,6 +2088,45 @@ h1 {
 .dataset-job {
   padding: 22px;
 }
+.review-toolbar, .review-tools, .review-downloads {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.review-toolbar { margin: 18px 0; }
+.review-toolbar label, .review-editor > label { font-size: 13px; font-weight: 600; }
+.review-toolbar select { display: block; margin-top: 8px; max-width: 100%; }
+.review-unsaved { font-size: 12px; color: #9b541e; }
+.review-comparison { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; margin: 16px 0 24px; }
+.review-source, .review-editor { min-width: 0; }
+.review-source h3 { font-size: 14px; margin-bottom: 12px; }
+.review-source { max-height: 1050px; overflow: auto; border: 1px solid #dce3d7; border-radius: 8px; padding: 12px; background: #f5f7f3; }
+.review-source img { width: 100%; height: auto; display: block; background: white; }
+.review-editor textarea { width: 100%; min-height: 480px; resize: vertical; font-family: inherit; font-size: 14px; line-height: 1.9; margin: 12px 0; white-space: pre-wrap; border: 1px solid #ccd8c4; border-radius: 7px; padding: 12px; background: #fcfdfb; }
+.review-editor textarea:focus { outline: 2px solid #708f61; outline-offset: 2px; }
+.review-tools { margin: 12px 0; }
+.review-tools > span { font-size: 11px; color: #606f57; }
+.review-before { margin: 16px 0; border-top: 1px solid #dce3d7; padding-top: 12px; }
+.review-before summary { cursor: pointer; font-size: 13px; }
+.review-before pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; font-size: 13px; line-height: 1.8; padding: 12px; background: #f5f7f3; max-height: 340px; overflow: auto; }
+.review-check { display: flex; align-items: flex-start; gap: 9px; font-size: 12px; line-height: 1.7; }
+.review-check input { margin-top: 4px; }
+.review-suggestions { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px; background: #f6f1e4; border-radius: 8px; }
+.review-suggestions strong { width: 100%; font-size: 12px; line-height: 1.8; }
+.review-suggestions button { font-size: 13px; }
+.review-publish { padding-top: 20px; border-top: 1px solid #dce3d7; }
+.review-publish h3 { font-size: 16px; }
+.review-publish p { font-size: 13px; line-height: 1.8; margin: 12px 0; }
+.review-downloads { margin-top: 18px; }
+.review-downloads p { width: 100%; }
+.review-pagination select { width: auto; margin: 0 6px; padding: 6px 9px; }
+@media (max-width: 1000px) {
+  .review-comparison { grid-template-columns: 1fr; }
+  .review-source { max-height: 500px; }
+  .review-toolbar select { min-width: 0; width: 100%; }
+  .review-toolbar label { width: 100%; }
+}
 .dataset-job strong {
   font-size: 13px;
 }

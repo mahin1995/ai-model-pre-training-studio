@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -39,6 +39,7 @@ import {
   updateDataset,
 } from "../services/datasets";
 import { Field } from "./Field";
+import { DatasetReview } from "./DatasetReview";
 const bytes = (size: number) =>
   size >= 1048576
     ? `${(size / 1048576).toFixed(2)} MiB`
@@ -62,9 +63,11 @@ const initialProcessing = (detail: DatasetDetail): ProcessingSettings =>
 export function Datasets({
   project,
   onSetup,
+  onDirtyChange,
 }: {
   project: Project | null;
   onSetup: () => void;
+  onDirtyChange: (dirty: boolean) => void;
 }) {
   if (!project?.revision)
     return (
@@ -81,9 +84,9 @@ export function Datasets({
         </button>
       </section>
     );
-  return <DatasetWorkspace key={project.id} projectId={project.id} />;
+  return <DatasetWorkspace key={project.id} projectId={project.id} onDirtyChange={onDirtyChange} />;
 }
-function DatasetWorkspace({ projectId }: { projectId: string }) {
+function DatasetWorkspace({ projectId, onDirtyChange }: { projectId: string; onDirtyChange: (dirty: boolean) => void }) {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [selected, setSelected] = useState<DatasetDetail | null>(null);
   const [importing, setImporting] = useState(false);
@@ -99,6 +102,8 @@ function DatasetWorkspace({ projectId }: { projectId: string }) {
   });
   const [review, setReview] = useState(false);
   const [deleteReview, setDeleteReview] = useState(false);
+  const [correctionDirty, setCorrectionDirty] = useState(false);
+  const updateReviewDirty = useCallback((dirty: boolean) => { setCorrectionDirty(dirty); onDirtyChange(dirty); }, [onDirtyChange]);
   const [preview, setPreview] = useState<DatasetPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -481,7 +486,7 @@ function DatasetWorkspace({ projectId }: { projectId: string }) {
       {(selected || importing) && (
         <button
           className="text-button dataset-back"
-          disabled={busy}
+          disabled={busy || correctionDirty}
           onClick={back}
         >
           <ArrowLeft size={15} />
@@ -595,7 +600,7 @@ function DatasetWorkspace({ projectId }: { projectId: string }) {
               </span>
               <button
                 className="secondary dataset-delete-button"
-                disabled={busy || active || deleteReview}
+                disabled={busy || active || deleteReview || correctionDirty}
                 onClick={() => setDeleteReview(true)}
                 title={active ? "Cancel or finish processing before deleting" : "Delete this dataset upload"}
               >
@@ -672,7 +677,7 @@ function DatasetWorkspace({ projectId }: { projectId: string }) {
                   onClick={() => {
                     setSettings({ ...job.settings });
                     setReview(false);
-                    setTab("Processing");
+                    setTab(job.correctionParentVersionId ? "Review" : "Processing");
                   }}
                 >
                   Review settings & retry
@@ -686,13 +691,14 @@ function DatasetWorkspace({ projectId }: { projectId: string }) {
             role="tablist"
             aria-label="Dataset details"
           >
-            {["Overview", "Preview", "Processing", "Splits"].map((name) => (
+            {["Overview", "Preview", "Review", "Processing", "Splits"].map((name) => (
               <button
                 key={name}
                 role="tab"
                 id={`dataset-tab-${name}`}
                 aria-selected={tab === name}
                 aria-controls="dataset-panel"
+                disabled={busy || correctionDirty}
                 onClick={() => {
                   setTab(name);
                   setNotice("");
@@ -703,14 +709,15 @@ function DatasetWorkspace({ projectId }: { projectId: string }) {
                     const names = [
                       "Overview",
                       "Preview",
+                      "Review",
                       "Processing",
                       "Splits",
                     ];
                     const next =
                       names[
                         (names.indexOf(name) +
-                          (e.key === "ArrowRight" ? 1 : 3)) %
-                          4
+                          (e.key === "ArrowRight" ? 1 : names.length - 1)) %
+                          names.length
                       ];
                     setTab(next);
                     document.getElementById(`dataset-tab-${next}`)?.focus();
@@ -718,7 +725,7 @@ function DatasetWorkspace({ projectId }: { projectId: string }) {
                 }}
                 tabIndex={tab === name ? 0 : -1}
               >
-                {name}
+                {name === "Review" ? "Review & Correct" : name}
               </button>
             ))}
           </div>
@@ -728,6 +735,9 @@ function DatasetWorkspace({ projectId }: { projectId: string }) {
             aria-labelledby={`dataset-tab-${tab}`}
             className="card dataset-panel"
           >
+            {tab === "Review" && <DatasetReview projectId={projectId} dataset={selected} active={active}
+              onDirtyChange={updateReviewDirty}
+              onQueued={(next) => { setSelected((current) => current ? { ...current, latestJob: next, status: next.status } : current); }} />}
             {tab === "Overview" && (
               <>
                 <div className="dataset-stats">
@@ -1197,6 +1207,11 @@ function DatasetWorkspace({ projectId }: { projectId: string }) {
                     Download all processed records
                     <Download size={14} />
                   </a>
+                  {selectedVersion.manifest.correction && <div className="review-downloads">
+                    <p className="dataset-caption">Reviewed correction · {selectedVersion.manifest.correction.reviewedRecords} records reviewed · {selectedVersion.manifest.correction.changedRecords} changed. Continuous text contains training data only.</p>
+                    {([['continuous', 'Continuous training text'], ['documents', 'Page-ordered documents'], ['corrections', 'Before/after correction report']] as const).map(([artifact, label]) =>
+                      <a className="secondary" key={artifact} href={downloadUrl(projectId, selected.id, selectedVersion.id, artifact)}><Download size={14}/>{label}</a>)}
+                  </div>}
                 </>
               ) : (
                 <div className="dataset-empty">

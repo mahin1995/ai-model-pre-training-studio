@@ -7,6 +7,7 @@ from uuid import UUID
 
 import psycopg
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg.types.json import Jsonb
@@ -51,6 +52,13 @@ def create_app(url: str | None = None, *, enable_worker: bool = True) -> FastAPI
     app.add_middleware(UploadBodyLimit)
     app.include_router(datasets_router)
     app.include_router(review_router)
+
+    @app.exception_handler(RequestValidationError)
+    def invalid_request(_request, exc):
+        # Do not echo document bodies in errors: invalid Unicode in input cannot
+        # itself be serialized as a UTF-8 response, and pages may be large.
+        return JSONResponse({"detail": [{"loc": list(error["loc"]), "type": error["type"],
+                                        "msg": error["msg"]} for error in exc.errors()]}, status_code=422)
 
     @app.middleware("http")
     async def local_origins(request: Request, call_next):

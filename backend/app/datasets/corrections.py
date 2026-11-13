@@ -36,9 +36,9 @@ def draft_summary(records, edits):
 
 
 def prepare_corrected(parent, output, parent_manifest, snapshot, notify):
-    originals = list(read_jsonl(parent / "processed.jsonl"))
     if checksum(parent / "processed.jsonl") != parent_manifest["processed"]["sha256"]:
         raise DatasetError("Parent version checksum mismatch. Restore its original artifacts before publishing corrections.")
+    originals = list(read_jsonl(parent / "processed.jsonl"))
     edits = snapshot["edits"]
     if set(edits) != {r["id"] for r in originals} or any(not e["reviewed"] for e in edits.values()):
         raise DatasetError("Every record must be reviewed before publishing a corrected version.")

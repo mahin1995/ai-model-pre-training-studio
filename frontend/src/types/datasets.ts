@@ -36,6 +36,7 @@ export const defaultProcessing: ProcessingSettings = {
 export type DatasetJob = {
   id: string;
   datasetId: string;
+  correctionParentVersionId?: string | null;
   status:
     | "queued"
     | "cleaning"

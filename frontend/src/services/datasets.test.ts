@@ -6,10 +6,26 @@ import {
   cancelJob,
   downloadUrl,
   deleteDataset,
+  getCorrectionPage,
+  saveCorrection,
+  publishCorrections,
 } from "./datasets";
 import { defaultProcessing } from "../types/datasets";
 afterEach(() => vi.unstubAllGlobals());
 describe("dataset API adapter", () => {
+  it("keeps correction edits and publication scoped to a parent version and draft revision", async () => {
+    const fetcher = vi.fn().mockImplementation(async () => Response.json({ revision: 7 }));
+    vi.stubGlobal("fetch", fetcher);
+    await getCorrectionPage("p", "d", "v1", 3);
+    expect(fetcher.mock.calls[0][0]).toBe("/api/projects/p/datasets/d/versions/v1/corrections?page=3");
+    const edit = { recordId: "f:3", text: "বাংলা সংশোধন", reviewed: true, revision: 6 };
+    await saveCorrection("p", "d", "v1", edit);
+    expect(fetcher.mock.calls[1][1].method).toBe("PUT");
+    expect(JSON.parse(fetcher.mock.calls[1][1].body)).toEqual(edit);
+    await publishCorrections("p", "d", "v1", 7);
+    expect(fetcher.mock.calls[2][0]).toBe("/api/projects/p/datasets/d/versions/v1/corrections/publish");
+    expect(JSON.parse(fetcher.mock.calls[2][1].body)).toEqual({ revision: 7 });
+  });
   it("deletes only the selected dataset under its project", async () => {
     const fetcher = vi.fn().mockResolvedValue(Response.json({ id: "duplicate", deleted: true, cleanupWarning: null }));
     vi.stubGlobal("fetch", fetcher);

@@ -8,7 +8,10 @@ export function DatasetReview({ projectId, dataset, active, onQueued, onDirtyCha
   projectId: string; dataset: DatasetDetail; active: boolean;
   onQueued: (job: DatasetJob) => void; onDirtyChange: (dirty: boolean) => void;
 }) {
-  const [versionId, setVersionId] = useState(dataset.versions[0]?.id ?? "");
+  const [versionId, setVersionId] = useState(
+    ["failed", "cancelled"].includes(dataset.latestJob?.status ?? "")
+      ? dataset.latestJob?.correctionParentVersionId ?? dataset.versions[0]?.id ?? ""
+      : dataset.versions[0]?.id ?? "");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<CorrectionPage | null>(null);
   const [text, setText] = useState("");
