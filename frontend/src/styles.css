@@ -2120,6 +2120,44 @@ h1 {
 .review-publish p { font-size: 13px; line-height: 1.8; margin: 12px 0; }
 .review-downloads { margin-top: 18px; }
 .review-downloads p { width: 100%; }
+.tokenizer-page { display: grid; gap: 22px; }
+.tokenizer-create, .tokenizer-details { padding: 28px; min-width: 0; }
+.tokenizer-create-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(140px, 1fr) auto; align-items: end; gap: 16px; }
+.tokenizer-page label { display: grid; gap: 8px; font-size: 13px; font-weight: 600; min-width: 0; }
+.tokenizer-page select, .tokenizer-page input, .tokenizer-page textarea { width: 100%; min-width: 0; padding: 11px 12px; background: #fcfdfb; border: 1px solid #ccd8c4; border-radius: 6px; font: inherit; }
+.tokenizer-page textarea { line-height: 1.9; resize: vertical; margin-top: 10px; }
+.tokenizer-page select:focus, .tokenizer-page input:focus, .tokenizer-page textarea:focus { outline: 2px solid #708f61; outline-offset: 2px; }
+.tokenizer-page h3 { font-size: 20px; font-weight: 500; }
+.tokenizer-page .text-button { display: inline-flex; align-items: center; gap: 7px; }
+.tokenizer-run-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.tokenizer-run-choice { padding: 18px; display: grid; gap: 10px; text-align: left; cursor: pointer; }
+.tokenizer-run-choice.selected { border-color: #708f61; background: #f0f5e9; }
+.tokenizer-run-choice strong { font-size: 14px; overflow-wrap: anywhere; }
+.tokenizer-run-choice span, .tokenizer-run-choice small { font-size: 12px; color: #606f57; }
+.tokenizer-playground, .sequence-panel { margin-top: 28px; padding-top: 26px; border-top: 1px solid #dce3d7; }
+.preparation-live { display: flex; gap: 10px; align-items: center; margin: 12px 0; font-size: 12px; line-height: 1.8; }
+.tokenizer-checksum { display: block; margin-top: 12px; font-size: 11px; overflow-wrap: anywhere; }
+.tokenizer-decoded { padding: 16px; margin: 12px 0; background: #f5f7f3; border: 1px solid #dce3d7; border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.8; max-height: 340px; overflow: auto; }
+.token-table-scroll { max-height: 400px; overflow: auto; margin-top: 16px; }
+.token-table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+.token-table th, .token-table td { padding: 10px; border-bottom: 1px solid #dce3d7; }
+.token-table th { background: #f0f5e9; position: sticky; top: 0; }
+.token-table code { overflow-wrap: anywhere; }
+.sequence-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.sequence-counts article { border: 1px solid #dce3d7; border-radius: 7px; padding: 18px; }
+.sequence-counts strong { display: block; font-size: 17px; font-weight: 500; margin: 12px 0; }
+.sequence-counts p { font-size: 11px; color: #606f57; line-height: 1.8; }
+.sequence-record { margin-top: 16px; border: 1px solid #dce3d7; border-radius: 7px; padding: 16px; min-width: 0; }
+.sequence-record h4 { font-size: 13px; overflow-wrap: anywhere; }
+.sequence-record summary { font-size: 12px; cursor: pointer; margin: 12px 0; }
+.sequence-record details pre { max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; line-height: 1.7; }
+.tokenizer-page .dataset-status.training, .tokenizer-page .dataset-status.encoding, .tokenizer-page .dataset-status.packing, .tokenizer-page .dataset-status.verifying, .tokenizer-page .dataset-status.validating { color: #796227; background: #f4edda; }
+@media (max-width: 850px) {
+  .tokenizer-create-fields { grid-template-columns: 1fr; }
+  .sequence-counts { grid-template-columns: 1fr; }
+  .tokenizer-create, .tokenizer-details { padding: 20px 16px; }
+  .tokenizer-page .preparation-status .card-heading { flex-wrap: wrap; }
+}
 .review-pagination select { width: auto; margin: 0 6px; padding: 6px 9px; }
 @media (max-width: 1000px) {
   .review-comparison { grid-template-columns: 1fr; }

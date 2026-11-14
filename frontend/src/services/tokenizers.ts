@@ -1,0 +1,14 @@
+import { request } from "./api";
+import type { EncodingPreview, PreparationRun, RunKind, SequencePreview, SourceVersion, SplitName } from "../types/tokenizers";
+const base = (project: string, kind: RunKind) => `/projects/${encodeURIComponent(project)}/${kind}`;
+const runPath = (project: string, kind: RunKind, id: string) => `${base(project, kind)}/${encodeURIComponent(id)}`;
+export const listSources = (project: string, signal?: AbortSignal) => request<SourceVersion[]>(`${base(project, "tokenizers")}/sources`, { signal });
+export const listRuns = (project: string, kind: RunKind, signal?: AbortSignal) => request<PreparationRun[]>(base(project, kind), { signal });
+export const startTokenizer = (project: string, datasetVersionId: string, vocabSize: number) => request<PreparationRun>(base(project, "tokenizers"), { method: "POST", body: JSON.stringify({ datasetVersionId, vocabSize }) });
+export const startSequences = (project: string, tokenizerRunId: string, sequenceLength: number) => request<PreparationRun>(base(project, "sequence-runs"), { method: "POST", body: JSON.stringify({ tokenizerRunId, sequenceLength }) });
+export const cancelPreparation = (project: string, kind: RunKind, id: string) => request<PreparationRun>(`${runPath(project, kind, id)}/cancel`, { method: "POST" });
+export const retryPreparation = (project: string, kind: RunKind, id: string) => request<PreparationRun>(`${runPath(project, kind, id)}/retry`, { method: "POST" });
+export const deletePreparation = (project: string, kind: RunKind, id: string) => request<{ deleted: boolean; cleanupWarning: string | null }>(runPath(project, kind, id), { method: "DELETE" });
+export const encodeText = (project: string, id: string, text: string, tokenPage: number) => request<EncodingPreview>(`${runPath(project, "tokenizers", id)}/encode`, { method: "POST", body: JSON.stringify({ text, tokenPage }) });
+export const previewSequences = (project: string, id: string, split: SplitName, page: number, signal?: AbortSignal) => request<SequencePreview>(`${runPath(project, "sequence-runs", id)}/preview?split=${split}&page=${page}`, { signal });
+export const preparationDownload = (project: string, kind: RunKind, id: string, artifact: string) => `/api${runPath(project, kind, id)}/download?artifact=${encodeURIComponent(artifact)}`;

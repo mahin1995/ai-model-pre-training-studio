@@ -8,7 +8,9 @@ Age app-er UI, configuration, PostgreSQL metadata ebong choto sample diye testab
 
 Dataset import, preview, basic cleaning, exact deduplication ebong document-level split-er jonno PyTorch lagbe na. Tokenizer-er small-sample test-o PyTorch chara kora jay. Boro dataset processing/tokenizer training CPU, RAM ebong disk-er upor heavy hote pare; tai prothome bounded sample use korbo.
 
-**Next implementation: Tokenizer screen + small-sample pipeline (M4).** M3 Datasets implemented; details `STEP_3_DATASETS_PLAN.md` ebong `artifacts/STEP_3_VERIFICATION.md`-e ache.
+**Next implementation: Model configuration screen and versioned configuration persistence (M5).** M4A tokenizer training/inspection and M4B training-sequence generation are implemented and verified; details `STEP_4_TOKENIZER_PLAN.md` and `artifacts/STEP_4_VERIFICATION.md`.
+
+2026-11-14 implementation: M4A and M4B now support reviewed-version CPU BPE fitting, exact encode/decode inspection, saved artifacts and non-overlapping padded sequence exports. Verified with isolated sample data. This does not start model training or imply a final full-corpus tokenizer is ready.
 
 M3 follow-up: PDF import, duplicate-upload deletion and **Review & Correct** are implemented. Version-scoped drafts support source-page comparison, explicit Bangla suggestions, manual table/text correction, revision conflicts and reviewed version publication with audit/continuous-text exports. This makes correction tooling available; the user's actual corpus still needs page-by-page review before publishing its corrected version. See `artifacts/DATASET_REVIEW_VERIFICATION.md`.
 
@@ -25,19 +27,20 @@ M3 follow-up: PDF import, duplicate-upload deletion and **Review & Correct** are
 | Save reliability | Server timestamps/revisions, concurrent-edit conflict detection | Complete |
 | Project selection/import | Saved project switching, explicit legacy browser-draft import | Complete |
 | Datasets | TXT/JSONL/PDF import, preview, cleaning/deduplication, grouped splits, upload deletion, reviewed corrections and immutable version downloads | Complete |
+| Tokenizer + sequences | Reviewed-source CPU BPE training, encode/decode inspection, immutable artifacts, masks/labels, token-stream and bundle downloads | Complete — bounded samples |
 | Environment screen | Python, packages, PyTorch/CUDA probe, NVIDIA driver, RAM/disk results | Complete |
 | Local launcher | `.venv` setup, dependencies, PostgreSQL + Python + React launch | Complete |
 | Production serving path | Built React frontend ebong API same Python server theke serve | Verified locally |
 
-Environment screen complete mane training environment ready na. Last verified setup-e GPU driver RTX 3060 / 12 GB VRAM report korechilo; backend `.venv`-e PyTorch ebong core training libraries install kora hoyni. Datasets import/processing feature ready; user-er actual training corpus selection/import ekhono korte hobe. Final tokenizer, model checkpoint ba training run ekhono nei.
+Environment screen complete mane model-training environment ready na. Last verified setup-e GPU driver RTX 3060 / 12 GB VRAM report korechilo; backend `.venv`-e PyTorch install kora hoyni. The standalone tokenizer dependency is installed. The uploaded corpus has reviewed versions; its latest eligible reviewed version passed read-only source validation. A final full-corpus tokenizer, model checkpoint and model-training run remain future execution work.
 
-Latest verification (2026-11-14): 22 frontend tests + 52 backend tests pass, production build passes, and the reviewed correction workflow passes in desktop/mobile browser checks. Details: `artifacts/DATASET_REVIEW_VERIFICATION.md`. Original Step 3 verification is in `artifacts/STEP_3_VERIFICATION.md`; Step 2 verification is in `artifacts/STEP_2_VERIFICATION.md`.
+Latest verification (2026-11-14): 26 frontend tests + 69 backend tests pass, production build and dependency checks pass, and tokenizer/sequence workflows pass in desktop/mobile browser checks. Details: `artifacts/STEP_4_VERIFICATION.md`. Earlier correction, dataset and backend verification remain in their respective artifact notes.
 
 ## 3. Kototuku baki?
 
 - Initial app foundation ebong project/environment management complete.
-- Nicher revised roadmap-e **8-ti milestone baki**: 4-ti feature-building milestone, tarpor 4-ti heavier execution milestone. M3 Datasets complete.
-- Tokenizer, Model Config, Pre-training, Evaluation, Fine-tuning ebong Playground-er functional workflows baki. Oi sidebar entries ekhono planned placeholders; Datasets ekhon functional.
+- Nicher revised roadmap-e **7-ti milestone baki**: 3-ti feature-building milestone, tarpor 4-ti heavier execution milestone. M3 Datasets and M4 tokenizer/sequences complete.
+- Model Config, Pre-training, Evaluation, Fine-tuning ebong Playground-er functional workflows baki. Those sidebar entries remain planned; Datasets and Tokenizer are functional.
 - **Actual model training ekhono shuru hoyni.** Training project-er scope, data sources, permission ebong acceptance criteria user-keo fill/confirm korte hobe; UI complete howa diye ei decisions automatically complete hoy na.
 - Time/effort-er percentage ekhon reliable na: dataset size, final model size ebong pilot throughput jana nei. Milestone count-ke elapsed-time ba total-effort percentage hisebe dhorbo na.
 
@@ -61,15 +64,17 @@ Latest verification (2026-11-14): 22 frontend tests + 52 backend tests pass, pro
 
 **Deferred:** Full corpus processing, large-scale near-deduplication, automatic web collection ebong expensive scanning.
 
-### M4 — Tokenizer screen + small-sample pipeline
+### M4 — Tokenizer screen + small-sample pipeline (complete: 2026-11-14)
 
-- [ ] Tokenizer method, vocabulary size, special tokens ebong output location configuration.
-- [ ] Saved dataset training split select kora; validation/test data diye tokenizer train na kora.
-- [ ] Small sample-e tokenizer train, progress/status ebong artifact save.
-- [ ] Bangla/English/mixed text encode/decode preview.
-- [ ] Token count, basic efficiency report ebong saved tokenizer metadata.
+- [x] Tokenizer method, vocabulary size, fixed special tokens and generated artifact locations.
+- [x] Reviewed dataset training split selection; validation/test never used for fitting.
+- [x] CPU sample fitting, durable status/cancel/retry and immutable artifact publication.
+- [x] Bangla/English/mixed text encode/decode preview, paginated token IDs/pieces/offsets.
+- [x] Actual vocabulary, token counts, measured efficiency/timing and saved metadata.
+- [x] M4B: fixed-length source-isolated sequences, tail retention, masks, labels, previews and complete export bundles.
+- [x] Project isolation, snapshot/checksum validation, restart recovery and dependency-protected deletion.
 
-**Done when:** Bounded training sample theke tokenizer create, save/reload ebong encode/decode verify kora jay. Compatible standalone tokenizer dependency lagte pare; PyTorch lagbe na.
+**Verified:** Bounded sample → tokenizer fit/save/reload → exact encoding → sequence generation → bundle download passes in real PostgreSQL/API/browser checks. Standalone `tokenizers==0.22.2` is pinned; no PyTorch dependency was introduced.
 
 **Deferred:** Full training corpus-er final tokenizer run ebong whole-corpus tokenization.
 
@@ -168,7 +173,7 @@ Completed: App foundation + Project Setup + PostgreSQL + Environment inspection
     ↓
 M3 Datasets (small samples — COMPLETE)
     ↓
-M4 Tokenizer (small-sample test)
+M4 Tokenizer + sequence exports (small-sample test — COMPLETE)
     ↓
 M5 Model configuration
     ↓
@@ -196,8 +201,8 @@ Prottek milestone complete hole ei file-e corresponding checklist ebong completi
 | Initial UI foundation (Step 1) | Complete |
 | FastAPI/PostgreSQL/Environment (Step 2) | Complete |
 | M3 Datasets | Complete — small-sample pipeline verified |
-| M4 Tokenizer | Not started — next |
-| M5 Model Config | Not started |
+| M4 Tokenizer + sequences | Complete — bounded sample pipeline verified |
+| M5 Model Config | Not started — next |
 | M6 Training/job infrastructure | Not started |
 | M7 Evaluation/Playground preparation | Not started |
 | M8 Full environment/data preparation | Not started |
@@ -206,6 +211,8 @@ Prottek milestone complete hole ei file-e corresponding checklist ebong completi
 | M11 Fine-tuning/final inference | Not started |
 
 ## 8. Completion log
+
+2026-11-14: M4A/M4B complete. Reviewed-version selection, train-only byte-level BPE, exact encoding previews, cancellable native jobs, fixed-length sequence exports and ZIP downloads verified with 69 backend / 26 frontend tests and a real desktop/mobile browser workflow. The live 27-page reviewed source passed read-only validation. No full-corpus tokenizer run or model training was started.
 
 2026-11-14: Review & Correct workflow verified using an isolated PostgreSQL database and generated PDF fixture: save/reload, page review, Version 2 publication, unchanged parent artifacts, derived export checksums and responsive browser flow. The live uploaded PDF is preserved; no actual corpus was automatically marked reviewed. Tokenizer/model training remain unimplemented.
 

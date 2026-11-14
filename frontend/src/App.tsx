@@ -38,6 +38,7 @@ import { listProjects, loadProject, saveProject } from "./services/projects";
 import { loadProject as loadLegacyProject } from "./services/legacy-project";
 import { Environment } from "./components/Environment";
 import { Datasets } from "./components/Datasets";
+import { Tokenizer } from "./components/Tokenizer";
 const nav: { name: string; icon: LucideIcon }[] = [
   { name: "Overview", icon: LayoutDashboard },
   { name: "Project Setup", icon: Settings2 },
@@ -423,7 +424,7 @@ export default function App() {
             >
               <Icon size={18} />
               <span>{name}</span>
-              {index > 3 && <span className="nav-planned">Soon</span>}
+              {index > 4 && <span className="nav-planned">Soon</span>}
               {page === name && <span className="active-dot" />}
             </button>
           ))}
@@ -596,7 +597,9 @@ export default function App() {
                           ? "Verify your Python environment and inspect the resources on your backend host."
                           : page === "Datasets"
                             ? "Build a clean, reproducible text dataset, one small sample at a time."
-                            : "One step at a time. This part of your model journey is coming next."}
+                            : page === "Tokenizer"
+                              ? "Train a vocabulary on reviewed text, inspect tokens and prepare training sequences."
+                              : "One step at a time. This part of your model journey is coming next."}
                   </p>
                 </div>
                 {page === "Overview" && p && (
@@ -1524,6 +1527,8 @@ export default function App() {
                   onSetup={() => navigate("Project Setup")}
                   onDirtyChange={setDatasetDirty}
                 />
+              ) : page === "Tokenizer" ? (
+                <Tokenizer project={p} onSetup={() => navigate("Project Setup")} onDatasets={() => navigate("Datasets")}/>
               ) : (
                 <section className="empty-card planned-page">
                   <span className="planned-icon">

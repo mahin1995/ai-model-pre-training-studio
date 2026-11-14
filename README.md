@@ -2,7 +2,7 @@
 
 A local workspace for building a small language model, from requirements to pre-training and fine-tuning.
 
-React + TypeScript frontend, Python/FastAPI backend, and **PostgreSQL project storage**. Overview, Project Setup, Environment, and the small-data Datasets pipeline are implemented. Tokenizer/model training remain later milestones.
+React + TypeScript frontend, Python/FastAPI backend, and **PostgreSQL project storage**. Project Setup, Environment, Datasets, reviewed corrections, CPU tokenizer training and bounded training-sequence exports are implemented. Actual model training remains a later milestone.
 
 ## UI screenshots
 
@@ -154,7 +154,7 @@ TXT files may contain multi-line text and an optional UTF-8 BOM. JSONL requires 
 
 Missing record source/language inherits the import form values. Empty text records are counted at import and removed by default during cleaning. Unicode NFC, line-ending normalization, outer trimming, empty removal and exact deduplication default on. HTML/script/style removal and internal whitespace collapse default off. Bangla joiners and meaningful characters are preserved.
 
-The default split is **90/5/5**, seed **42**. Explicit `group_id` values and identical cleaned content stay in the same split, including when deduplication is off. Source grouping additionally keeps each source together. Deduplicated records keep the first document and merge provenance. Actual ratios may differ because whole groups stay intact. Each non-zero split needs at least one independent group; when only one group exists, choose 100/0/0 or add more independent groups. No tokenization is performed.
+The default split is **90/5/5**, seed **42**. Explicit `group_id` values and identical cleaned content stay in the same split, including when deduplication is off. Source grouping additionally keeps each source together. Deduplicated records keep the first document and merge provenance. Actual ratios may differ because whole groups stay intact. Each non-zero split needs at least one independent group; when only one group exists, choose 100/0/0 or add more independent groups. Dataset processing itself does not tokenize; use the Tokenizer screen after publishing a reviewed version.
 
 Each successful run creates an immutable version with counts, source references, settings/seed and SHA-256 checksums. Failed/cancelled runs do not replace previous outputs. A PostgreSQL-backed worker starts with FastAPI and processes one job globally at a time. Jobs have heartbeat leases; interrupted running jobs are marked failed after a 60-second expired lease, and can be retried. Queued jobs survive restarts.
 
@@ -173,6 +173,24 @@ After all records are reviewed and saved, choose **Review publication → Create
 Corrected versions keep the same record IDs, provenance and split membership, including 100/0/0 for a single PDF. In **Splits**, download the corrected JSONL, manifest, before/after correction report, page-ordered documents (`documents.jsonl`, with source boundaries and split labels), or continuous **training-only** text. No tokenizer or model is trained here. The UI is a review tool: a user's actual corpus is not automatically marked reviewed or published.
 
 See [review workflow verification](artifacts/DATASET_REVIEW_VERIFICATION.md).
+
+## Tokenizer training and sequence exports
+
+1. Open **Tokenizer** and select a reviewed dataset version. The newest eligible reviewed version is selected initially; newer unreviewed processing versions are disabled. Source permission must be confirmed and the training split nonempty.
+2. Choose a vocabulary target (default **8,000**, range 260–32,000), then **Train tokenizer**. Byte-level BPE learns only from the training documents. A PDF is one ordered document, not one document per page. Small corpora may yield a vocabulary below the target; use the displayed **actual vocabulary size** for later model configuration.
+3. Inspect the completed run, measured fit duration and checksums. Download `tokenizer.json`, configuration, special-token mapping or manifest. The pinned `tokenizers==0.22.2` dependency is installed by the launcher; PyTorch/Transformers are not required for this workflow.
+4. In **Encode / Decode**, enter up to 16 KiB UTF-8 and choose **Encode text**. Inspect IDs, byte-level pieces and Unicode character offsets, with 256 rows per page. Full decoded text must exactly match input, including Bangla joiners, whitespace, emoji and literal `[EOS]`/`[PAD]` spellings. Individual byte pieces can look unfamiliar.
+5. Choose sequence length **128/256/512/1024** (default 512), then **Generate sequences**. Uses the same saved tokenizer and fixed dataset version. The builder adds BOS/EOS once per source document, keeps sources/splits separate, and writes non-overlapping right-padded blocks. A singleton tail borrows the preceding block's final token without duplication; every sequence retains at least one next-token target.
+6. Preview IDs, masks, labels and document token ranges. Real-token labels equal input IDs; padding labels are `-100`. The future causal model/loss must shift targets exactly once. Decoding one byte-level block can show a partial character at its boundary; whole-document token streams preserve exact text.
+7. Download split JSONL, `documents.tokens.jsonl`, the manifest or **complete bundle** ZIP. Empty validation/test splits are retained as empty files with an explicit notice. The bundle includes the exact tokenizer/configuration, all splits and token streams. Its manifest lists constituent file hashes, not hashes of itself or its containing ZIP.
+
+Runs persist in PostgreSQL; artifacts live under `STUDIO_DATA_DIR/tokenizers/` and `STUDIO_DATA_DIR/sequences/`. One preparation worker serializes dataset, tokenizer and sequence work globally. Native fitting/encoding runs in a cancellable child process without database credentials. Queued work survives restart; expired running work fails with retry guidance. Retry creates a new run using the original source/settings, not the latest dataset version. Failed runs leave previously published outputs intact.
+
+Sample limits: 20 MiB reviewed text, 10,000 source records, 2,000,000 content tokens for sequence generation, 256 MiB output and at least 512 MiB free storage. Exceeding limits fails explicitly; text is never silently sampled or truncated. Source version artifacts and downloaded outputs are checked against saved checksums. Delete dependent sequence runs before deleting their tokenizer, and remove tokenizer runs before deleting their source dataset.
+
+This workflow prepares data; it does not initialize or train a language model. The later model configuration must support the chosen sequence length and actual vocabulary size. Future Transformers integration must preserve the exported literal-special-token policy (`split_special_tokens=true`) and unshifted-label contract.
+
+See [Step 4 verification and screenshots](artifacts/STEP_4_VERIFICATION.md).
 
 ## Verify
 
@@ -210,6 +228,18 @@ Dataset endpoints (prefix `/api/projects/{project_id}/datasets`):
 - `GET /{dataset_id}/files/{file_id}/pages/{page}/image` — render a bounded PNG of an imported PDF page.
 
 Corrected-version downloads additionally accept `continuous` (training-only TXT), `documents` (source-separated JSONL) and `corrections` (before/after JSON report).
+
+Tokenizer endpoints (`/api/projects/{project_id}/tokenizers`):
+
+- `GET /sources`: eligible/rejected dataset versions and reasons; `GET /` / `POST /`: list / queue fitting with `{datasetVersionId, vocabSize}`.
+- `GET /{run_id}`: durable status, source, settings and artifacts; `POST /{run_id}/encode`: `{text, tokenPage}` for bounded inspection.
+- `POST /{run_id}/cancel`, `POST /{run_id}/retry`, `DELETE /{run_id}`: lifecycle controls; deletion is dependency-protected.
+- `GET /{run_id}/download?artifact=tokenizer|config|special_tokens|manifest`.
+
+Sequence endpoints (`/api/projects/{project_id}/sequence-runs`) share list/detail/cancel/retry/delete behavior:
+
+- `POST /`: `{tokenizerRunId, sequenceLength}`; `GET /{run_id}/preview?split=train&page=1`: up to five sequences per response.
+- `GET /{run_id}/download?artifact=train|validation|test|tokens|manifest|bundle`.
 
 ## Plans and verification
 
