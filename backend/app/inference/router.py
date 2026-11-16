@@ -145,7 +145,8 @@ def create_evaluation(project_id: UUID,body: EvaluationCreate,request: Request):
             # Lock prompt-set identity before taking a version reference, so delete
             # cannot race the FK insert. Versions themselves are immutable.
             prompts=prompt_version(conn,project_id,body.promptSetVersionId)
-            conn.execute('SELECT id FROM prompt_sets WHERE id=%s FOR UPDATE',(prompts['prompt_set_id'],))
+            locked=conn.execute('SELECT id FROM prompt_sets WHERE id=%s FOR UPDATE',(prompts['prompt_set_id'],)).fetchone()
+            if not locked:raise HTTPException(404,'Prompt set was deleted before submission. Reload prompt sets.')
             snapshot=checkpoint_snapshot(conn,request.app.state.data_root,project_id,body.checkpointIds)
             if body.externalDatasetVersionId:
                 snapshot['externalSource']=external_snapshot(conn,request.app.state.data_root,project_id,body.externalDatasetVersionId)

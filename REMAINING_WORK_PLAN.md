@@ -1,6 +1,6 @@
 # Pre-training Studio — Progress ebong Remaining Work
 
-Updated: 2026-11-15 (Asia/Dhaka)
+Updated: 2026-11-16 (Asia/Dhaka)
 
 ## 1. Agreed working order
 
@@ -8,7 +8,7 @@ Age app-er UI, configuration, PostgreSQL metadata ebong choto sample diye testab
 
 Dataset import, preview, basic cleaning, exact deduplication ebong document-level split-er jonno PyTorch lagbe na. Tokenizer-er small-sample test-o PyTorch chara kora jay. Boro dataset processing/tokenizer training CPU, RAM ebong disk-er upor heavy hote pare; tai prothome bounded sample use korbo.
 
-**Implemented next phase: M5 Model Config and bounded CPU smoke training.** Saved configurations, isolated runtime, real training metrics, checkpoints, fresh-process reload/resume and browser workflow are verified. See `STEP_5_MODEL_SMOKE_TEST_PLAN.md` and `artifacts/STEP_5_VERIFICATION.md`. Next execution work: correct/review the chosen corpus, run its own smoke test and verify CUDA before scaling up; evaluation/fine-tuning remain later features.
+**Latest delivered: M7 bounded Evaluation and Playground.** Saved CPU checkpoints now support plain completion, immutable prompt sets, checkpoint comparison, training diagnostics, original/external held-out scoring and human annotations. See `STEP_6_EVALUATION_PLAYGROUND_PLAN.md` and `artifacts/STEP_6_VERIFICATION.md`. Next phase is a separate bounded whole-dataset training pilot with explicit coverage/epoch configuration; independent validation documents and CUDA verification are needed before broader quality/scaling claims.
 
 2026-11-14 implementation: M4A and M4B now support reviewed-version CPU BPE fitting, exact encode/decode inspection, saved artifacts and non-overlapping padded sequence exports. Verified with isolated sample data. This does not start model training or imply a final full-corpus tokenizer is ready.
 
@@ -30,20 +30,22 @@ M3 follow-up: PDF import, duplicate-upload deletion and **Review & Correct** are
 | Tokenizer + sequences | Reviewed-source CPU BPE training, encode/decode inspection, immutable artifacts, masks/labels, token-stream and bundle downloads | Complete — bounded samples |
 | Model Config | Source-derived vocabulary/context, bounded architecture/training settings, immutable revisions and export | Complete — smoke configuration |
 | Smoke training | Isolated CPU runtime, real loss/gradients, single-worker jobs, checkpoints, reload/resume and downloads | Verified — CPU fixtures; CUDA pending |
+| Evaluation | Fixed prompt versions, up to four checkpoints, all-train/smoke-subset diagnostics, original/external held-out scoring, revisioned human notes and reports | Complete — bounded CPU workflow |
+| Playground | Frozen-tokenizer CPU checkpoint completion, token-budget preview, history and exports | Complete — plain text completion |
 | Environment screen | Python, packages, PyTorch/CUDA probe, NVIDIA driver, RAM/disk results | Complete |
 | Local launcher | `.venv` setup, dependencies, PostgreSQL + Python + React launch | Complete |
 | Production serving path | Built React frontend ebong API same Python server theke serve | Verified locally |
 
 Environment scope alada: backend `.venv` remains without PyTorch; isolated `.venv-training` has verified Torch 2.11.0 CPU and Transformers 4.57.6. RTX 3060 / 12 GiB driver visible, but CUDA installation timed out and GPU execution is unverified. The live corpus's existing tokenizer/sequence passed read-only smoke-source validation; no live model run was created automatically. Full-corpus model training remains future execution work.
 
-Latest verification (2026-11-15): **77 backend + 30 frontend + 10 numerical tests pass**, one CUDA test explicitly skipped; production build and both dependency checks pass. Real desktop/mobile browser checks cover config → CPU training → checkpoint download/reload/resume. Details: `artifacts/STEP_5_VERIFICATION.md`. Earlier verification remains in its respective artifact notes.
+Latest verification (2026-11-16): **84 backend + 34 frontend + 13 numerical tests pass**, one existing CUDA test explicitly skipped; production build and both dependency checks pass. Real browser checks cover generation, context budget, four-checkpoint comparison over every fixture training block, external evaluation, empty validation, manual-note persistence and mobile layout. Details: `artifacts/STEP_6_VERIFICATION.md`. Earlier verification remains in its respective artifact notes.
 
 ## 3. Kototuku baki?
 
 - Initial app foundation ebong project/environment management complete.
-- M3, M4 and bounded M5 complete. M6, M8 and M9 partially delivered by the CPU smoke workflow; M7, M10 and M11 remain future work. Counts do not represent effort percentages.
-- Model Config and Pre-training smoke controls are functional. Evaluation, Fine-tuning and Playground remain planned.
-- **Isolated numerical model training is verified; live/full-corpus pre-training has not started.** Project scope, corpus quality, permissions, capacity and acceptance criteria still need final review before larger execution.
+- M3, M4, bounded M5 and bounded M7 complete. M6, M8 and M9 have partial execution coverage; M10 and M11 remain future work. Counts do not represent effort percentages.
+- Model Config, Pre-training smoke controls, Evaluation and Playground are functional. Fine-tuning remains planned.
+- **The live corpus has completed CPU smoke runs, and live all-train-block checkpoint evaluation is observed.** Full-corpus training has not started: smoke training still uses at most two blocks. Source quality, independent validation, capacity and acceptance criteria need review before larger execution.
 - Time/effort-er percentage ekhon reliable na: dataset size, final model size ebong pilot throughput jana nei. Milestone count-ke elapsed-time ba total-effort percentage hisebe dhorbo na.
 
 ## 4. Phase A — Age lightweight feature development
@@ -107,17 +109,19 @@ Latest verification (2026-11-15): **77 backend + 30 frontend + 10 numerical test
 
 **Delivered:** Bounded real CPU executor/checkpoints. **Deferred:** CUDA execution verification, full training controls and actual SFT processing.
 
-### M7 — Evaluation + Playground UI/API preparation
+### M7 — Evaluation + Playground (bounded CPU workflow complete: 2026-11-16)
 
-- [ ] Fixed evaluation prompt sets create/save/load.
-- [ ] Evaluation report schema, comparison UI ebong empty/loading/error states.
-- [ ] Playground prompt/chat layout ebong generation-settings form.
-- [ ] Inference request/streaming-response contract ebong model selection.
-- [ ] Verified model/executor na thakle generation/run controls unavailable state.
+- [x] Immutable prompt-set versions, create/save/load/export and draft protection.
+- [x] Real checkpoint comparison/reporting, target-weighted metrics and explicit empty/loading/error states.
+- [x] Plain-completion Playground and bounded greedy generation settings.
+- [x] Queued CPU inference API, checkpoint selection, polling/cancel/retry/history and downloads.
+- [x] Eligibility, source/runtime/hash/context gates and dependency-protected deletion.
+- [x] Independent reviewed external-corpus encoding with frozen tokenizer and exact-overlap checks.
+- [x] Separate revisioned human annotations; no automatic factual accuracy score.
 
-**Done when:** Prompt/configuration/report workflows ready ebong inference integration-er boundaries clear. Real model output/metrics chara real evaluation complete bola hobe na.
+**Verified:** Real CPU checkpoint loading/generation, seven inference API tests, numerical loss/immutability tests and a four-checkpoint desktop/mobile browser workflow. Current live corpus's seven blocks are training diagnostics; validation/test remain unavailable unless independent data is supplied.
 
-**Deferred:** Real inference, measured metrics, generation streaming ebong model quality comparison.
+**Deferred:** Streaming/chat, sampling strategies, CUDA inference, sliding-window PPL, reserved final-test workflow and broader quality claims. Plain inference and measured block metrics are delivered.
 
 ## 5. Phase B — Sheshe heavier execution
 
@@ -208,13 +212,15 @@ Prottek milestone complete hole ei file-e corresponding checklist ebong completi
 | M4 Tokenizer + sequences | Complete — bounded sample pipeline verified |
 | M5 Model Config | Complete — bounded smoke preset |
 | M6 Training/job infrastructure | Smoke workflow verified; fine-tuning/full-run controls pending |
-| M7 Evaluation/Playground preparation | Not started |
+| M7 Evaluation/Playground | Complete — bounded real CPU inference and metrics |
 | M8 Full environment/data preparation | CPU runtime ready; CUDA/full-corpus preparation pending |
 | M9 Model smoke test | CPU fixture verified; target corpus/final capacity and CUDA pending |
 | M10 Pre-training/base evaluation | Not started |
 | M11 Fine-tuning/final inference | Not started |
 
 ## 8. Completion log
+
+2026-11-16: Evaluation and Playground implemented and verified. 84 backend / 34 frontend / 13 numerical tests pass; existing CUDA test skipped. Browser checks cover four checkpoints, all 19 fixture train blocks, independent external scoring, empty-validation unavailability, notes/draft guards, refresh and mobile layout. Migration 007 applied. Read-only live inspection observed a completed comparison of checkpoints 50/100/150/200 over all seven original train blocks, labeled as diagnostics. Existing datasets/checkpoints remain intact; no new model training was triggered. See `artifacts/STEP_6_VERIFICATION.md`.
 
 2026-11-15: Model Config and bounded CPU smoke workflow verified. 77 backend / 30 frontend / 10 numerical tests pass; one CUDA test skipped after dependency-download timeouts. Browser checks passed config saving/navigation protection, real training, lower same-subset loss, checkpoint download/reload/resume and mobile layout. Migrations 005/006 applied; live source artifacts passed read-only validation. No live model run was created automatically. Details: `artifacts/STEP_5_VERIFICATION.md`.
 

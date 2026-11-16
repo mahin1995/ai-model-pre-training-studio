@@ -12,6 +12,7 @@ RUNNING = ACTIVE[1:]
 
 
 def valid_text(text, limit=4096):
+    if '\x00' in text:raise ValueError('Text must not contain NUL characters.')
     try:
         if len(text.encode('utf-8')) > limit:
             raise ValueError(f'Text must be at most {limit} UTF-8 bytes.')

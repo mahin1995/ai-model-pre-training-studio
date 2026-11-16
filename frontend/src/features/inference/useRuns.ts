@@ -44,7 +44,7 @@ export function useRuns(project: string, kind: InferenceKind) {
   }
   async function start(operation: () => Promise<InferenceRun>) {
     setBusy(true); setError(""); setNotice("");
-    try { const run = await operation(); setRuns((all) => [run, ...all]); setSelectedId(run.id); setNotice("Run queued. Checkpoint weights and tokenizer remain unchanged."); }
+    try { const run = await operation(); setRuns((all) => [run, ...all]); setSelectedId(run.id); setNotice("Run created. Track its status below; saved weights and tokenizer are unchanged."); }
     catch (e) { setError(e instanceof Error ? e.message : "Could not start inference."); }
     finally { setBusy(false); }
   }

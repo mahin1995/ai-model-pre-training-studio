@@ -143,12 +143,20 @@ def test_external_frozen_encoding_and_overlap_rejection(workspace,test_database)
     metric=result['manifest']['report']['results'][0]['metrics'];assert metric['heldOutAvailable'] and metric['primary']['available'] and metric['primary']['documents']==3
     assert client.delete(path).status_code==409
     assert client.delete(url).status_code==200
+    # A different file/dataset can still repeat cleaned training content.
+    edit,rev=save_all(client,path,independent,{1:TRAIN_TEXT[1].strip()})
+    assert client.post(edit+'/publish',json={'revision':rev}).status_code==202
+    run_job(client,test_database)
+    overlapping=client.get(path).json()['versions'][0]
+    rejected=client.post(base+'/evaluation-runs',json={**body,'externalDatasetVersionId':overlapping['id']})
+    assert rejected.status_code==409 and 'duplicates cleaned' in rejected.json()['detail']
     assert client.delete(path).status_code==200
 
 
 def test_validation_isolation_cancel_retry_and_recovery(workspace,test_database):
     client,data=workspace;base=data['base'];cp=data['run']['checkpoints'][0]['id']
     for invalid in (7,True,129):assert client.post(base+'/generation-runs',json={'checkpointId':cp,'prompt':'','maxNewTokens':invalid}).status_code==422
+    assert client.post(base+'/generation-runs',json={'checkpointId':cp,'prompt':'\x00','maxNewTokens':8}).status_code==422
     assert client.post(base+'/generation-runs',json={'checkpointId':cp,'prompt':'x '*2000,'maxNewTokens':8}).status_code==409
     assert client.post(base+'/generation-runs',content=json.dumps({'checkpointId':cp,'prompt':'\ud800'}),headers={'Content-Type':'application/json'}).status_code==422
     assert client.post('/api/projects/'+str(uuid4())+'/generation-runs',json={'checkpointId':cp,'prompt':'Hello'}).status_code==404

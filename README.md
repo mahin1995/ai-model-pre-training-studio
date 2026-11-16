@@ -218,6 +218,26 @@ Training shares the existing single-worker preparation lock. Cancellation termin
 
 Bounds: 50–500 steps, up to 15 minutes, at most 10 million model parameters, 1 GiB outputs, 2 GiB available RAM and 5 GiB free artifact disk. Conservative checkpoint/bundle estimates may reject large combinations before launch. Real memory fit is checked by execution. CUDA installation was not completed during verification because wheel downloads timed out; CPU training/reload/resume passed. See [smoke-test verification](artifacts/STEP_5_VERIFICATION.md).
 
+## Checkpoint Playground and Evaluation
+
+**Playground** runs plain text completion on a saved CPU-trained checkpoint. Choose a completed training run/checkpoint, enter a prompt and select 8/16/32/64/128 new tokens. The live preview shows prompt tokens plus BOS and remaining context. Prompts are limited to 4 KiB UTF-8; context overflow is rejected without truncation. Greedy decoding uses the exact frozen tokenizer, stops on EOS and suppresses generated PAD/UNK/BOS. Final checkpoint selection is a convenient default, not a quality ranking.
+
+Results are saved automatically with checkpoint/tokenizer hashes, raw generated IDs, output timing, JSON/JSONL reports and ZIP download. A NUL byte in model output is escaped for display; raw token IDs preserve it. Outputs can be repetitive or unreadable after tiny-subset training. This feature does not chat-fine-tune the model or modify its weights.
+
+**Evaluation** compares up to four checkpoints from one run using the same immutable prompt-set version and greedy decoding. Save up to 20 prompts with optional reviewer context. **Edit as new version** preserves older versions; human readability/repetition/source-agreement notes are saved separately with optimistic revisions. Unsaved prompts/review notes block navigation until saved or discarded. Report exports never turn these notes into an automatic accuracy score.
+
+Choose an explicit metric source:
+
+- **All original train blocks:** scores every selected-source train block, plus a separate score for the original smoke subset. The remaining blocks from the same PDF are not an independent held-out set.
+- **Original validation split:** scores a nonempty held-out split. If empty, numerical metrics remain **Not available**, while prompt comparisons can still run.
+- **Independent reviewed external corpus:** select a reviewed version with confirmed source permission. It is encoded using the checkpoint tokenizer with no refitting, even if its original dataset export labels its records `train`. Known dataset/file/document/group/content overlap is blocked. Exact checks do not rule out near-duplicates; review independence manually.
+
+Reported loss is weighted by actual causal target-token counts, excluding padding and each block's unpredicted first token. **Block-based NLL/PPL v1** uses existing document-isolated non-overlapping blocks; its perplexity is not accuracy or sliding-window corpus PPL. Compare only the same tokenizer, target data and scoring protocol. Reserved test-set tuning and automatic best-checkpoint ranking are outside this workflow.
+
+Inference uses the existing single-worker queue and isolated `.venv-training` subprocess. Initial support is CPU-trained checkpoints on their matching pinned CPU runtime. Maximum: four checkpoints, 20 prompts, 256 evaluation blocks, 15 minutes and 128 MiB result artifacts. Missing/corrupt artifacts, incompatible runtime, over-limit requests and known overlaps fail explicitly. Cancellation/retry/restart recovery are durable; referenced checkpoints, prompt versions and external datasets are protected from deletion. Existing runtime setup and app start commands remain unchanged.
+
+See [Step 6 verification and screenshots](artifacts/STEP_6_VERIFICATION.md).
+
 ## Verify
 
 ```bash
@@ -280,6 +300,16 @@ Model/training endpoints (prefix `/api/projects/{project_id}`):
 - `GET /smoke-runs/{id}/download?artifact=bundle|report|sample|metrics|config|tokenizer|tokenizer_config|special_tokens|manifest`.
 - `GET /smoke-runs/{id}/checkpoints/{checkpoint_id}/download`: checksum-verified checkpoint ZIP, including saved model and restricted-load tensor/optimizer state.
 
+Inference endpoints (same project prefix):
+
+- `GET /inference-sources`: completed runs/checkpoints and eligibility; `POST /inference-preview`: `{checkpointId, prompt}` token budget.
+- `GET/POST /prompt-sets`: all saved versions / create a set or append a version using optional set `id`; body includes `name`, `language`, `prompts: [{text, notes}]`.
+- `GET /prompt-sets/{set_id}/versions/{version}` and `/export`; `DELETE /prompt-sets/{set_id}` is dependency-protected.
+- `POST /generation-runs`: `{checkpointId, prompt, maxNewTokens}`.
+- `POST /evaluation-runs`: `{checkpointIds, promptSetVersionId, maxNewTokens, metricScope, externalDatasetVersionId?}`; scope is `training`, `validation` or `external`.
+- Both run types have list/detail/cancel/retry/delete and `/download?artifact=bundle|report|outputs|manifest|events`.
+- `GET/PUT /evaluation-runs/{id}/annotations`: revisioned human observations keyed by checkpoint and prompt index; `/annotations/export` downloads the current review snapshot separately.
+
 ## Plans and verification
 
 - [Full training roadmap](MODEL_TRAINING_PLAN.md)
@@ -291,4 +321,6 @@ Model/training endpoints (prefix `/api/projects/{project_id}`):
 - [Step 3 verification](artifacts/STEP_3_VERIFICATION.md)
 - [Model smoke-test plan](STEP_5_MODEL_SMOKE_TEST_PLAN.md)
 - [Model smoke-test verification](artifacts/STEP_5_VERIFICATION.md)
+- [Evaluation/Playground plan](STEP_6_EVALUATION_PLAYGROUND_PLAN.md)
+- [Evaluation/Playground verification](artifacts/STEP_6_VERIFICATION.md)
 - [Verification artifacts](artifacts/)

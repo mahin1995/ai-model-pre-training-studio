@@ -1,6 +1,8 @@
 # Step 6 — Checkpoint Evaluation and Playground Plan
 
-Status: **Planned; implementation has not started.**
+Status: **Implemented and verified on CPU, 16 November 2026.** Playground, immutable prompt sets, checkpoint comparison, original/external evaluation, revisioned human notes, lifecycle and exports are functional. Whole-dataset pilot training remains a separate phase.
+
+Evidence: [Step 6 verification](artifacts/STEP_6_VERIFICATION.md).
 
 Date: 16 November 2026, Asia/Dhaka. This delivers the next bounded part of roadmap M7. Whole-dataset pilot training follows separately; this phase does not expand or rerun training automatically.
 

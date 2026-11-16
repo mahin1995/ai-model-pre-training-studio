@@ -52,3 +52,8 @@ def test_inference_loads_only_safetensors_and_generates_deterministically(tmp_pa
     assert all(i>=4 for i in tokenizer.encode('বাংলা [EOS]',add_special_tokens=False).ids)
     for key,value in before.items():assert torch.equal(value,model.state_dict()[key])
     with pytest.raises(ValueError,match='context'):generate(model,tokenizer,'Hello '*200,128)
+    nul=tokenizer.encode('\x00',add_special_tokens=False).ids
+    def generated_nul(input_ids,**kwargs):return torch.cat([input_ids,torch.tensor([nul+[3]])],dim=1)
+    monkeypatch.setattr(model,'generate',generated_nul)
+    escaped=generate(model,tokenizer,'Hello',8)
+    assert escaped['escapedNul'] and escaped['text']=='\\u0000' and escaped['newTokenIds']==nul+[3]
