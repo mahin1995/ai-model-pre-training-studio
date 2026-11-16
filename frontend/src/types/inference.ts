@@ -1,0 +1,14 @@
+import type { ModelConfiguration, TrainingRuntime } from "./training";
+export type InferenceKind = "generation" | "evaluation";
+export type InferenceSource = { id: string; createdAt: string; status: string; datasetName: string; datasetVersion: number; configuration: ModelConfiguration; runtime: TrainingRuntime; tokenizerSha256: string; trainingBlocks: number; validationBlocks: number; checkpoints: { id: string; step: number; eligible: boolean; reason: string | null }[] };
+export type Prompt = { text: string; notes: string };
+export type PromptSetDraft = { id?: string; name: string; language: "bn" | "en" | "mixed"; prompts: Prompt[] };
+export type PromptVersion = PromptSetDraft & { id: string; promptSetId: string; version: number; createdAt: string };
+export type Generation = { promptIndex: number; prompt: string; text: string; tokenIds: number[]; newTokenIds: number[]; promptTokenCount: number; generatedTokenCount: number; elapsedSeconds: number; tokensPerSecond: number; stoppedOnEOS: boolean };
+export type LossMetric = { available: boolean; reason?: string; loss: number | null; perplexity: number | null; perplexityOverflow?: boolean; targetTokens: number; blocks: number; documents: number };
+export type CheckpointResult = { checkpointId: string; step: number; weightsUnchanged: boolean; metrics: { scope: string; primary: LossMetric; trainedSubset: LossMetric; heldOutAvailable: boolean } | null; generations: Generation[] };
+export type InferenceReport = { kind: InferenceKind; results: CheckpointResult[]; warnings: string[]; protocol: { name: string; blockLength: number; boundaries: string; targets: string }; elapsedSeconds: number; tokenizerSha256: string };
+export type InferenceRun = { id: string; kind: InferenceKind; status: string; trainingRunId: string; settings: { kind: InferenceKind; maxNewTokens: number; prompts: Prompt[]; metricScope?: string }; checkpoints: { id: string; step: number }[]; cancelRequested: boolean; createdAt: string; elapsedSeconds: number; error: string | null; metrics: { completedUnits?: number; totalUnits?: number; checkpointStep?: number }; manifest: { report: InferenceReport; artifacts: Record<string, { filename: string; sha256: string; sizeBytes: number }> } | null };
+export type Annotation = { checkpointId: string; promptIndex: number; revision: number; readability: "not-reviewed" | "readable" | "needs-review"; repetition: "not-reviewed" | "present" | "absent"; sourceAgreement: "not-reviewed" | "matches-source" | "needs-review"; notes: string };
+export const inferenceActive = (run: Pick<InferenceRun, "status">) => ["queued", "validating", "loading", "running", "verifying"].includes(run.status);
+export type PromptBudget = { promptTokens: number; bosTokens: number; contextLength: number; availableNewTokens: number; roundTripMatches: boolean };

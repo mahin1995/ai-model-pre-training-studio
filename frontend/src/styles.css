@@ -2620,3 +2620,27 @@ h1 {
   .training-runtime .card-heading, .smoke-details .card-heading { align-items: flex-start; flex-wrap: wrap; gap: 14px; }
   .training-page .dataset-stats { grid-template-columns: 1fr; gap: 18px; }
 }
+.inference-results, .inference-prompt-result, .inference-output { min-width: 0; }
+.inference-results progress { width: 100%; accent-color: #42683a; }
+.inference-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.inference-comparison.single { grid-template-columns: minmax(0, 1fr); }
+.inference-output { border: 1px solid var(--border, #d5dece); border-radius: 6px; padding: 18px; }
+.inference-output h4 { margin: 0 0 14px; }
+.inference-prompt-result { margin-top: 26px; border-top: 1px solid var(--border, #d5dece); padding-top: 10px; }
+.inference-prompt, .inference-continuation, .inference-ids { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.65; }
+.inference-prompt { background: #f4f6f0; border-radius: 5px; padding: 16px; }
+.inference-continuation { min-height: 70px; }
+.inference-ids { font: 12px monospace; }
+.inference-page details { padding: 12px 0; }
+.inference-page summary { cursor: pointer; }
+.inference-table-wrap { max-width: 100%; overflow-x: auto; margin: 20px 0; }
+.inference-table { border-collapse: collapse; min-width: 650px; width: 100%; text-align: left; }
+.inference-table caption { text-align: left; padding: 12px 0; font-weight: 600; }
+.inference-table th, .inference-table td { border-bottom: 1px solid var(--border, #d5dece); padding: 13px 10px; font-size: 13px; }
+.checkpoint-options { display: flex; flex-wrap: wrap; gap: 20px; padding: 20px; border: 1px solid var(--border, #d5dece); border-radius: 5px; margin-top: 24px; }
+.checkpoint-options label { display: inline-flex; align-items: center; gap: 8px; }
+.inference-page .checkpoint-options input { width: auto; }
+.prompt-editor-row { display: grid; gap: 12px; padding: 16px 0; border-top: 1px solid var(--border, #d5dece); }
+.annotation-editor { display: grid; gap: 13px; padding-top: 12px; }
+.inference-page .tokenizer-checksum, .inference-page code { overflow-wrap: anywhere; }
+@media (max-width: 750px) { .inference-comparison { grid-template-columns: minmax(0, 1fr); } }

@@ -16,6 +16,7 @@ from .schemas import ProcessingSettings
 from .storage import DatasetError, storage_path
 from ..tokenizers.jobs import claim_preparation, execute_preparation, recover_preparation
 from ..training.jobs import claim_smoke, execute_smoke, recover_smoke
+from ..inference.jobs import claim_inference, execute_inference, recover_inference
 
 logger = logging.getLogger(__name__)
 WORKER_LOCK = 734120502
@@ -155,6 +156,7 @@ class DatasetWorker:
                         recover_interrupted(conn, self.root)
                         recover_preparation(conn, self.root)
                         recover_smoke(conn, self.root)
+                        recover_inference(conn, self.root)
                         job = claim_job(conn, worker_id)
                         if job:
                             execute_job(conn, self.root, job, self.stopping)
@@ -168,7 +170,11 @@ class DatasetWorker:
                                 if smoke:
                                     execute_smoke(conn, self.root, smoke, self.stopping)
                                 else:
-                                    self.stopping.wait(0.5)
+                                    inference = claim_inference(conn, worker_id)
+                                    if inference:
+                                        execute_inference(conn, self.root, inference, self.stopping)
+                                    else:
+                                        self.stopping.wait(0.5)
             except Exception:
                 logger.warning("Dataset worker temporarily unavailable; queued jobs remain in PostgreSQL.")
                 self.stopping.wait(2)

@@ -1,0 +1,105 @@
+"""CPU-only inference and scoring. Never restores optimizer/training RNG state."""
+import json
+from pathlib import Path
+import time
+
+import torch
+from tokenizers import Tokenizer
+from transformers import GPT2LMHeadModel
+
+from ..training.data import digest, write_json
+from .data import summarize_loss, validate_block
+
+
+def load_model(directory,config):
+    model=GPT2LMHeadModel.from_pretrained(directory,local_files_only=True,use_safetensors=True,attn_implementation='eager').to('cpu')
+    actual=model.config
+    if (actual.vocab_size!=config['vocabSize'] or actual.n_positions!=config['contextLength']
+            or actual.n_embd!=config['hiddenSize'] or actual.n_layer!=config['layers'] or actual.n_head!=config['heads']
+            or actual.pad_token_id!=0 or actual.bos_token_id!=2 or actual.eos_token_id!=3
+            or sum(p.numel() for p in model.parameters())!=config['estimatedParameters']):
+        raise ValueError('Checkpoint model does not match the saved configuration.')
+    model.eval()
+    model.requires_grad_(False)
+    return model
+
+
+def generate(model,tokenizer,prompt,maximum):
+    encoded=tokenizer.encode(prompt,add_special_tokens=False)
+    ids=[2]+encoded.ids
+    if len(ids)+maximum>model.config.n_positions:
+        raise ValueError('Prompt/output exceeds context; no input was truncated.')
+    if tokenizer.decode(encoded.ids,skip_special_tokens=False)!=prompt:
+        raise ValueError('Frozen tokenizer did not preserve the prompt.')
+    start=time.monotonic()
+    with torch.inference_mode():
+        source=torch.tensor([ids],dtype=torch.long)
+        output=model.generate(input_ids=source,attention_mask=torch.ones_like(source),max_new_tokens=maximum,
+            do_sample=False,use_cache=True,pad_token_id=0,bos_token_id=2,eos_token_id=3,suppress_tokens=[0,1,2])
+    duration=time.monotonic()-start
+    full=output[0].tolist();new=full[len(ids):]
+    if full[:len(ids)]!=ids or len(new)>maximum or any(i<0 or i>=model.config.vocab_size for i in full) or any(i in (0,1,2) for i in new):
+        raise ValueError('Generation produced invalid token IDs.')
+    return {'prompt':prompt,'text':tokenizer.decode(new,skip_special_tokens=True),'tokenIds':full,'newTokenIds':new,
+            'promptTokenCount':len(encoded.ids),'generatedTokenCount':len(new),'elapsedSeconds':duration,
+            'tokensPerSecond':len(new)/duration if duration else 0,'stoppedOnEOS':bool(new and new[-1]==3)}
+
+
+def score(model,records,config,notify=lambda:None):
+    total=0.0;targets=0
+    model.eval()
+    with torch.inference_mode():
+        for record in records:
+            count=validate_block(record,config['vocabSize'],config['contextLength'])
+            data={key:torch.tensor([record[key]],dtype=torch.long) for key in ('input_ids','attention_mask','labels')}
+            loss=model(**data,use_cache=False).loss.item()
+            # Reject NaN/Inf immediately; do not let a later record hide it.
+            summarize_loss(loss*count,count,1,1)
+            total+=loss*count;targets+=count;notify()
+    return summarize_loss(total,targets,len(records),len({r.get('documentId','document') for r in records}))
+
+
+def execute(directory,emit):
+    directory=Path(directory)
+    request=json.loads((directory/'request.json').read_text())
+    config=request['configuration']
+    records=[json.loads(line) for line in (directory/'records.jsonl').read_text().splitlines()]
+    subset=[json.loads(line) for line in (directory/'subset.jsonl').read_text().splitlines()]
+    tokenizer=Tokenizer.from_file(str(directory/'tokenizer.json'))
+    tokenizer.encode_special_tokens=True;tokenizer.no_padding();tokenizer.no_truncation()
+    if tokenizer.get_vocab_size()!=config['vocabSize'] or any(tokenizer.token_to_id(t)!=i for t,i in config['specialIds'].items()):
+        raise ValueError('Tokenizer vocabulary/special IDs differ from the checkpoint configuration.')
+    torch.set_num_threads(2);torch.use_deterministic_algorithms(True)
+    prompts=request['settings']['prompts'];completed=0
+    total=len(request['checkpoints'])*(len(prompts)+len(records)+len(subset))
+    results=[];started=time.monotonic()
+    def tick():
+        nonlocal completed
+        completed+=1;emit({'stage':'running','completedUnits':completed,'totalUnits':total})
+    for checkpoint in request['checkpoints']:
+        emit({'stage':'loading','checkpointStep':checkpoint['step'],'completedUnits':completed,'totalUnits':total})
+        path=directory/'checkpoints'/checkpoint['id']
+        before=digest(path/'model.safetensors')
+        model=load_model(path,config)
+        outputs=[]
+        for index,prompt in enumerate(prompts):
+            outputs.append({'promptIndex':index,**generate(model,tokenizer,prompt['text'],request['settings']['maxNewTokens'])});tick()
+        metrics=None
+        if request['settings']['kind']=='evaluation':
+            primary=score(model,records,config,tick)
+            trained=score(model,subset,config,tick)
+            metrics={'scope':request['settings']['metricScope'],'primary':primary,'trainedSubset':trained,
+                     'heldOutAvailable':request['heldOutAvailable']}
+        if before!=digest(path/'model.safetensors'):
+            raise ValueError('Inference unexpectedly changed saved model weights.')
+        results.append({'checkpointId':checkpoint['id'],'step':checkpoint['step'],'modelSha256':before,
+                        'weightsUnchanged':True,'metrics':metrics,'generations':outputs})
+        del model
+    report={'kind':request['settings']['kind'],'results':results,'warnings':request['warnings'],
+            'protocol':{'name':'block-based NLL/PPL v1','blockLength':config['contextLength'],
+                'boundaries':'document isolated; one BOS/EOS; non-overlapping; right padded',
+                'targets':'model shifts once; ignore -100; first block token unpredicted'},
+            'runtime':request['runtime'],'settings':request['settings'],'elapsedSeconds':time.monotonic()-started,
+            'tokenizerSha256':digest(directory/'tokenizer.json'),'configuration':config}
+    write_json(directory/'report.json',report)
+    return report

@@ -188,6 +188,8 @@ def delete_run(project_id: UUID, run_id: UUID, request: Request):
             raise HTTPException(409,'Cancel or finish this run before deletion.')
         if conn.execute('SELECT 1 FROM smoke_runs WHERE parent_run_id=%s',(run_id,)).fetchone():
             raise HTTPException(409,'Delete dependent resumed runs before deleting this run and its checkpoints.')
+        if conn.execute('SELECT 1 FROM inference_runs WHERE training_run_id=%s',(run_id,)).fetchone():
+            raise HTTPException(409,'Delete dependent generation/evaluation runs before deleting this training run and its checkpoints.')
         conn.execute('DELETE FROM smoke_checkpoints WHERE run_id=%s',(run_id,))
         conn.execute('DELETE FROM smoke_runs WHERE id=%s',(run_id,))
     warning=None

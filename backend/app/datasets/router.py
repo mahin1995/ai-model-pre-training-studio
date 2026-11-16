@@ -153,6 +153,8 @@ def delete_dataset(project_id: UUID, dataset_id: UUID, request: Request):
                         (dataset_id, list(ACTIVE))).fetchone():
             raise HTTPException(409, "Cancel or finish dataset processing before deleting this upload.")
         expected_key = dataset_key(project_id, dataset_id)
+        if conn.execute("SELECT 1 FROM inference_runs WHERE external_dataset_id=%s LIMIT 1", (dataset_id,)).fetchone():
+            raise HTTPException(409, "Delete dependent external evaluation runs before deleting this dataset.")
         if conn.execute("SELECT 1 FROM tokenizer_runs WHERE dataset_id=%s LIMIT 1", (dataset_id,)).fetchone():
             raise HTTPException(409, "Delete dependent sequence runs and tokenizer runs before deleting this dataset upload.")
         if row["storage_key"] != expected_key:
