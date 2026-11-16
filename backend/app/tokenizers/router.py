@@ -188,6 +188,8 @@ def register_common(router, kind):
                 raise HTTPException(409, "Cancel or finish this run before deleting it.")
             if kind == "tokenizer" and conn.execute("SELECT 1 FROM sequence_runs WHERE tokenizer_run_id=%s", (run_id,)).fetchone():
                 raise HTTPException(409, "Delete the dependent sequence runs before deleting this tokenizer.")
+            if conn.execute(f"SELECT 1 FROM model_configs WHERE {'tokenizer_run_id' if kind == 'tokenizer' else 'sequence_run_id'}=%s", (run_id,)).fetchone():
+                raise HTTPException(409, "Delete dependent model configurations and smoke runs first.")
             conn.execute(f"DELETE FROM {table} WHERE id=%s", (run_id,))
         warning = None
         try:

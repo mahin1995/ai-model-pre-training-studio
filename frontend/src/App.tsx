@@ -39,6 +39,8 @@ import { loadProject as loadLegacyProject } from "./services/legacy-project";
 import { Environment } from "./components/Environment";
 import { Datasets } from "./components/Datasets";
 import { Tokenizer } from "./components/Tokenizer";
+import { ModelConfig } from "./components/ModelConfig";
+import { PreTraining } from "./components/PreTraining";
 const nav: { name: string; icon: LucideIcon }[] = [
   { name: "Overview", icon: LayoutDashboard },
   { name: "Project Setup", icon: Settings2 },
@@ -81,6 +83,11 @@ export default function App() {
   const [pending, setPending] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [datasetDirty, setDatasetDirty] = useState(false);
+  const [modelDirty, setModelDirty] = useState(false);
+  const workflowDirty = datasetDirty || modelDirty;
+  useEffect(() => {
+    if (!workflowDirty) setNotice((current) => current.startsWith("Save or discard your dataset/configuration edits") ? "" : current);
+  }, [workflowDirty]);
   const loadSequence = useRef(0);
   const dirty = JSON.stringify(project) !== savedJson;
   async function refreshProjects() {
@@ -117,14 +124,14 @@ export default function App() {
   }, []);
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
-      if (dirty) {
+      if (dirty || workflowDirty) {
         event.preventDefault();
         event.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [dirty]);
+  }, [dirty, workflowDirty]);
   useEffect(() => {
     if (!pending) return;
     const previousFocus = document.activeElement as HTMLElement | null;
@@ -158,9 +165,9 @@ export default function App() {
     const onRoute = () => {
       const target = pageFromHash();
       if (target === page) return;
-      if (datasetDirty) {
+      if (workflowDirty) {
         window.history.replaceState(null, "", routeFor(page));
-        setNotice("Save or undo your dataset correction draft before leaving.");
+        setNotice("Save or discard your dataset/configuration edits before leaving.");
         return;
       }
       if (dirty) {
@@ -170,7 +177,7 @@ export default function App() {
     };
     window.addEventListener("hashchange", onRoute);
     return () => window.removeEventListener("hashchange", onRoute);
-  }, [page, dirty, datasetDirty]);
+  }, [page, dirty, workflowDirty]);
   useEffect(() => {
     if (!menu) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -210,7 +217,7 @@ export default function App() {
   }
   function navigate(next: string) {
     if (saving) return;
-    if (datasetDirty) { setNotice("Save or undo your dataset correction draft before leaving."); return; }
+    if (workflowDirty) { setNotice("Save or discard your dataset/configuration edits before leaving."); return; }
     setMenu(false);
     if (next === page) return;
     if (dirty) setPending(next);
@@ -240,7 +247,7 @@ export default function App() {
   }
   function chooseProject(next: string) {
     if (saving) return;
-    if (datasetDirty) { setNotice("Save or undo your dataset correction draft before switching projects."); return; }
+    if (workflowDirty) { setNotice("Save or discard your dataset/configuration edits before switching projects."); return; }
     if (dirty) setPending(next);
     else void applyNavigation(next);
   }
@@ -424,7 +431,7 @@ export default function App() {
             >
               <Icon size={18} />
               <span>{name}</span>
-              {index > 4 && <span className="nav-planned">Soon</span>}
+              {index > 6 && <span className="nav-planned">Soon</span>}
               {page === name && <span className="active-dot" />}
             </button>
           ))}
@@ -599,6 +606,10 @@ export default function App() {
                             ? "Build a clean, reproducible text dataset, one small sample at a time."
                             : page === "Tokenizer"
                               ? "Train a vocabulary on reviewed text, inspect tokens and prepare training sequences."
+                              : page === "Model Config"
+                                ? "Configure a tiny model using your saved tokenizer and training sequences."
+                                : page === "Pre-training"
+                                  ? "Verify real training, numerical stability and checkpoints with a bounded smoke test."
                               : "One step at a time. This part of your model journey is coming next."}
                   </p>
                 </div>
@@ -1529,6 +1540,10 @@ export default function App() {
                 />
               ) : page === "Tokenizer" ? (
                 <Tokenizer project={p} onSetup={() => navigate("Project Setup")} onDatasets={() => navigate("Datasets")}/>
+              ) : page === "Model Config" ? (
+                <ModelConfig project={p} onSetup={() => navigate("Project Setup")} onTokenizer={() => navigate("Tokenizer")} onTraining={() => navigate("Pre-training")} onDirtyChange={setModelDirty}/>
+              ) : page === "Pre-training" ? (
+                <PreTraining project={p} onSetup={() => navigate("Project Setup")} onConfig={() => navigate("Model Config")}/>
               ) : (
                 <section className="empty-card planned-page">
                   <span className="planned-icon">

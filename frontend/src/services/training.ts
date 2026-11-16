@@ -1,0 +1,15 @@
+import { request } from "./api";
+import type { ModelConfig, SmokeRun, SmokeSettings, TrainingMetric, TrainingRuntime } from "../types/training";
+const base = (project: string) => `/projects/${encodeURIComponent(project)}`;
+export const listModelConfigs = (project: string, signal?: AbortSignal) => request<ModelConfig[]>(`${base(project)}/model-configs`, { signal });
+export const saveModelConfig = (project: string, draft: { name: string; sequenceRunId: string; settings: SmokeSettings }) => request<ModelConfig>(`${base(project)}/model-configs`, { method: "POST", body: JSON.stringify(draft) });
+export const deleteModelConfig = (project: string, id: string) => request<{ deleted: boolean }>(`${base(project)}/model-configs/${encodeURIComponent(id)}`, { method: "DELETE" });
+export const modelConfigExport = (project: string, id: string) => `/api${base(project)}/model-configs/${encodeURIComponent(id)}/export`;
+export const trainingRuntime = (project: string, refresh = false, signal?: AbortSignal) => request<TrainingRuntime>(`${base(project)}/training-runtime?refresh=${refresh}`, { signal: signal ?? AbortSignal.timeout(75000) });
+export const listSmokeRuns = (project: string, signal?: AbortSignal) => request<SmokeRun[]>(`${base(project)}/smoke-runs`, { signal });
+export const startSmoke = (project: string, modelConfigId: string) => request<SmokeRun>(`${base(project)}/smoke-runs`, { method: "POST", body: JSON.stringify({ modelConfigId }), signal: AbortSignal.timeout(90000) });
+export const smokeAction = (project: string, id: string, action: "cancel" | "retry" | "resume", checkpointId?: string) => request<SmokeRun>(`${base(project)}/smoke-runs/${encodeURIComponent(id)}/${action}`, { method: "POST", body: checkpointId ? JSON.stringify({ checkpointId }) : undefined, signal: AbortSignal.timeout(90000) });
+export const deleteSmoke = (project: string, id: string) => request<{ deleted: boolean; cleanupWarning: string | null }>(`${base(project)}/smoke-runs/${encodeURIComponent(id)}`, { method: "DELETE" });
+export const smokeMetrics = (project: string, id: string, afterStep: number, signal?: AbortSignal) => request<{ events: TrainingMetric[]; latest: TrainingMetric }>(`${base(project)}/smoke-runs/${encodeURIComponent(id)}/metrics?afterStep=${afterStep}`, { signal });
+export const smokeDownload = (project: string, id: string, artifact: string) => `/api${base(project)}/smoke-runs/${encodeURIComponent(id)}/download?artifact=${encodeURIComponent(artifact)}`;
+export const checkpointDownload = (project: string, id: string, checkpoint: string) => `/api${base(project)}/smoke-runs/${encodeURIComponent(id)}/checkpoints/${encodeURIComponent(checkpoint)}/download`;

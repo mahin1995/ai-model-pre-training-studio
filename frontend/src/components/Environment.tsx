@@ -13,6 +13,7 @@ import {
 import { request } from "../services/api";
 import type { EnvironmentReport } from "../types/environment";
 import type { Project } from "../types/project";
+import { TrainingRuntime } from "./TrainingRuntime";
 export function Environment({
   project,
   onApply,
@@ -70,12 +71,13 @@ export function Environment({
   );
   return (
     <div className="environment-page">
+      {project?.revision ? <TrainingRuntime key={project.id} projectId={project.id}/> : null}
       <section className="environment-intro card">
         <span className="environment-icon">
           <Terminal size={27} />
         </span>
         <div>
-          <h2>Check your training environment.</h2>
+          <h2>Check the backend environment.</h2>
           <p>
             Inspect the machine running the Python backend. Checks are read-only
             and do not install packages or change your project.

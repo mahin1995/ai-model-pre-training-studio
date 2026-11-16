@@ -6,6 +6,7 @@ dist/
 !.env.example
 __pycache__/
 .venv/
+.venv-training/
 data/
 checkpoints/
 logs/

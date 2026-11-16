@@ -125,7 +125,7 @@ Open **Environment → Run environment checks**. The backend checks:
 - NVIDIA driver and reported GPU memory, independently of PyTorch access.
 - Total/available RAM and free disk at `STUDIO_DATA_DIR` (repository root by default).
 
-Results describe the **backend host**, not the browser device or a remote cloud training machine. Missing packages, CPU-only PyTorch, timeouts, and unavailable disk paths are reported with next actions. PyTorch and training libraries are intentionally not installed by the app setup: choose a hardware-compatible build separately using the official PyTorch installer. Install training packages into the same `.venv` that runs the backend.
+Results describe the **backend host**, not the browser device or a remote cloud training machine. The backend checks inspect the API interpreter; the separate **Training runtime** panel tests the smoke executor in `.venv-training`. Missing optional PyTorch/Transformers packages in the API `.venv` do not prevent smoke training when the isolated runtime passes. Normal app setup does not install training libraries; use the explicit setup below.
 
 You can explicitly copy PyTorch-visible GPU details, RAM and free disk to a local project draft, then review/save it. This is disabled for cloud projects and when GPU visibility is unverified. Heterogeneous GPU memory uses the smallest detected VRAM value. Checks do not run a forward/backward pass, estimate model capacity, or guarantee training readiness.
 
@@ -192,15 +192,44 @@ This workflow prepares data; it does not initialize or train a language model. T
 
 See [Step 4 verification and screenshots](artifacts/STEP_4_VERIFICATION.md).
 
+## Model configuration and smoke training
+
+The **Model Config** and **Pre-training** pages support a bounded, real training diagnostic. They use a randomly initialized tiny GPT-2-style causal model and saved sequences, with no pretrained-model download. This establishes pipeline behavior on a small training subset; it does not establish language quality or rule accuracy.
+
+Set up the training environment explicitly, once:
+
+```bash
+python3 scripts/setup_training.py --profile cpu
+# NVIDIA alternative, after checking driver/wheel compatibility:
+python3 scripts/setup_training.py --profile cu128
+```
+
+The script creates `.venv-training`, checks binary-wheel availability, installs pinned dependencies and runs `pip check`. It prefers an available Python 3.13/3.12 or uses the invoking interpreter; `--python /path/to/python` selects one explicitly. Python 3.14 with Torch 2.11.0 CPU was verified here. A predownloaded wheel cache can be used with `--wheelhouse /path/to/wheels --offline`. Normal startup never installs this stack. `STUDIO_TRAINING_PYTHON` optionally selects a server-controlled interpreter; clients cannot supply executable paths.
+
+1. Open **Model Config** and select a completed sequence run from an eligible reviewed version. Vocabulary, context and special IDs come from its saved tokenizer/sequences. They are read-only; generate shorter sequences first if a smaller context is needed.
+2. Review model/training settings and **Save new revision**. Default: 2 layers, hidden size 128, 4 heads, FP32, AdamW at 0.0003, 200 optimizer steps, batch 1, seed 42, no warmup/dropout. Unsaved edits block navigation until saved/discarded. Config revisions are immutable and exportable; parameter/storage estimates are checked before submission.
+3. Open **Pre-training**, **Check training runtime**, then **Run smoke test**. CPU/CUDA readiness uses a real forward/backward probe in the training interpreter. Auto selects working CUDA or CPU; detected CUDA execution failures require repair or explicit CPU selection.
+4. Watch actual optimizer steps, loss, target-token throughput, step time, CPU RSS and CUDA peak memory when available. Only the first one or two train blocks are cycled. Before/after loss is measured on the same subset in eval mode; 5% reduction is the diagnostic pass target. Insufficient reduction gives `needs-attention`, preserving results.
+5. Download the complete bundle/report, inspect the bounded generated sample and download verified checkpoints. Checkpoints are saved every 50 steps and at completion. **Resume verification** starts a new linked run from an intermediate checkpoint, preserving optimizer/RNG/cursor state. Runs ending at step 50 have no intermediate checkpoint to resume.
+
+The model shifts causal targets once internally; saved labels remain unshifted and padding labels stay `-100`. At least two real tokens per block are required. Empty validation/test splits remain valid for this train-only diagnostic; no held-out metrics are fabricated. Generation may be unreadable after tiny-subset training.
+
+Training shares the existing single-worker preparation lock. Cancellation terminates the child process; interrupted leases fail with retry available. Partial checkpoints are hidden, verified completed checkpoints can survive cancellation/failure, and source artifacts are never edited. Retry starts from scratch; resume requires a completed parent, compatible config/source, exact runtime versions and device. Referenced source runs/configs/parent checkpoints are protected from deletion.
+
+Bounds: 50–500 steps, up to 15 minutes, at most 10 million model parameters, 1 GiB outputs, 2 GiB available RAM and 5 GiB free artifact disk. Conservative checkpoint/bundle estimates may reject large combinations before launch. Real memory fit is checked by execution. CUDA installation was not completed during verification because wheel downloads timed out; CPU training/reload/resume passed. See [smoke-test verification](artifacts/STEP_5_VERIFICATION.md).
+
 ## Verify
 
 ```bash
 npm test --prefix frontend
 npm run build --prefix frontend
-.venv/bin/python -m pytest
+.venv/bin/python -m pytest -q --tb=short
+.venv-training/bin/python -m pytest -q backend/training_tests --tb=short
 ```
 
 Backend integration tests use **real PostgreSQL**, creating and dropping a uniquely named test database. The configured PostgreSQL role must have `CREATEDB` permission for these tests (the local Docker role does). Alternatively set `TEST_DATABASE_URL` to a dedicated database whose name contains `test`; tests retain their uniquely identified records there and never clear the application database. Environment-probe unit tests simulate missing packages, timeouts and GPU outcomes.
+
+Real training API tests require explicit `.venv-training` setup; missing runtime/GPU tests are reported as skipped rather than numerical passes. Standalone numerical tests run in the training environment without the API/database stack. Verify these explicitly before claiming a working executor.
 
 SQL migrations are in `backend/migrations/`. Each migration is recorded transactionally, with an advisory lock preventing concurrent migration runs. Future schema changes should add a new numbered SQL migration.
 
@@ -241,6 +270,16 @@ Sequence endpoints (`/api/projects/{project_id}/sequence-runs`) share list/detai
 - `POST /`: `{tokenizerRunId, sequenceLength}`; `GET /{run_id}/preview?split=train&page=1`: up to five sequences per response.
 - `GET /{run_id}/download?artifact=train|validation|test|tokens|manifest|bundle`.
 
+Model/training endpoints (prefix `/api/projects/{project_id}`):
+
+- `GET/POST /model-configs`: list / save `{sequenceRunId, name, settings}`; `GET /model-configs/{id}`, `GET /model-configs/{id}/export`, `DELETE /model-configs/{id}`.
+- `GET /training-runtime?refresh=true`: scoped import/CPU/CUDA execution checks, up to 60 seconds.
+- `GET/POST /smoke-runs`: list / queue `{modelConfigId}`; `GET /smoke-runs/{id}` includes durable metrics, verdict and registered checkpoints.
+- `GET /smoke-runs/{id}/metrics?afterStep=50`: bounded optimizer-step events; no fabricated progress.
+- `POST /smoke-runs/{id}/cancel`, `/retry`, `/resume` (body `{checkpointId}`), `DELETE /smoke-runs/{id}`.
+- `GET /smoke-runs/{id}/download?artifact=bundle|report|sample|metrics|config|tokenizer|tokenizer_config|special_tokens|manifest`.
+- `GET /smoke-runs/{id}/checkpoints/{checkpoint_id}/download`: checksum-verified checkpoint ZIP, including saved model and restricted-load tensor/optimizer state.
+
 ## Plans and verification
 
 - [Full training roadmap](MODEL_TRAINING_PLAN.md)
@@ -250,4 +289,6 @@ Sequence endpoints (`/api/projects/{project_id}/sequence-runs`) share list/detai
 - [Step 2 verification](artifacts/STEP_2_VERIFICATION.md)
 - [Step 3 datasets implementation](STEP_3_DATASETS_PLAN.md)
 - [Step 3 verification](artifacts/STEP_3_VERIFICATION.md)
+- [Model smoke-test plan](STEP_5_MODEL_SMOKE_TEST_PLAN.md)
+- [Model smoke-test verification](artifacts/STEP_5_VERIFICATION.md)
 - [Verification artifacts](artifacts/)

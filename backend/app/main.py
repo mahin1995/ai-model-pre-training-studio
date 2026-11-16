@@ -21,6 +21,8 @@ from .datasets.router import router as datasets_router, UploadBodyLimit
 from .datasets.worker import DatasetWorker
 from .datasets.review_router import router as review_router
 from .tokenizers.router import tokenizer_router, sequence_router
+from .models.router import router as models_router
+from .training.router import router as training_router
 
 # Pool messages may include connection details; return actionable generic errors instead.
 logging.getLogger("psycopg.pool").setLevel(logging.CRITICAL)
@@ -55,6 +57,8 @@ def create_app(url: str | None = None, *, enable_worker: bool = True) -> FastAPI
     app.include_router(review_router)
     app.include_router(tokenizer_router)
     app.include_router(sequence_router)
+    app.include_router(models_router)
+    app.include_router(training_router)
 
     @app.exception_handler(RequestValidationError)
     def invalid_request(_request, exc):

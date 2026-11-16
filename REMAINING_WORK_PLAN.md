@@ -1,6 +1,6 @@
 # Pre-training Studio — Progress ebong Remaining Work
 
-Updated: 2026-11-14 (Asia/Dhaka)
+Updated: 2026-11-15 (Asia/Dhaka)
 
 ## 1. Agreed working order
 
@@ -8,7 +8,7 @@ Age app-er UI, configuration, PostgreSQL metadata ebong choto sample diye testab
 
 Dataset import, preview, basic cleaning, exact deduplication ebong document-level split-er jonno PyTorch lagbe na. Tokenizer-er small-sample test-o PyTorch chara kora jay. Boro dataset processing/tokenizer training CPU, RAM ebong disk-er upor heavy hote pare; tai prothome bounded sample use korbo.
 
-**Next implementation: Model configuration screen and versioned configuration persistence (M5).** M4A tokenizer training/inspection and M4B training-sequence generation are implemented and verified; details `STEP_4_TOKENIZER_PLAN.md` and `artifacts/STEP_4_VERIFICATION.md`.
+**Implemented next phase: M5 Model Config and bounded CPU smoke training.** Saved configurations, isolated runtime, real training metrics, checkpoints, fresh-process reload/resume and browser workflow are verified. See `STEP_5_MODEL_SMOKE_TEST_PLAN.md` and `artifacts/STEP_5_VERIFICATION.md`. Next execution work: correct/review the chosen corpus, run its own smoke test and verify CUDA before scaling up; evaluation/fine-tuning remain later features.
 
 2026-11-14 implementation: M4A and M4B now support reviewed-version CPU BPE fitting, exact encode/decode inspection, saved artifacts and non-overlapping padded sequence exports. Verified with isolated sample data. This does not start model training or imply a final full-corpus tokenizer is ready.
 
@@ -28,20 +28,22 @@ M3 follow-up: PDF import, duplicate-upload deletion and **Review & Correct** are
 | Project selection/import | Saved project switching, explicit legacy browser-draft import | Complete |
 | Datasets | TXT/JSONL/PDF import, preview, cleaning/deduplication, grouped splits, upload deletion, reviewed corrections and immutable version downloads | Complete |
 | Tokenizer + sequences | Reviewed-source CPU BPE training, encode/decode inspection, immutable artifacts, masks/labels, token-stream and bundle downloads | Complete — bounded samples |
+| Model Config | Source-derived vocabulary/context, bounded architecture/training settings, immutable revisions and export | Complete — smoke configuration |
+| Smoke training | Isolated CPU runtime, real loss/gradients, single-worker jobs, checkpoints, reload/resume and downloads | Verified — CPU fixtures; CUDA pending |
 | Environment screen | Python, packages, PyTorch/CUDA probe, NVIDIA driver, RAM/disk results | Complete |
 | Local launcher | `.venv` setup, dependencies, PostgreSQL + Python + React launch | Complete |
 | Production serving path | Built React frontend ebong API same Python server theke serve | Verified locally |
 
-Environment screen complete mane model-training environment ready na. Last verified setup-e GPU driver RTX 3060 / 12 GB VRAM report korechilo; backend `.venv`-e PyTorch install kora hoyni. The standalone tokenizer dependency is installed. The uploaded corpus has reviewed versions; its latest eligible reviewed version passed read-only source validation. A final full-corpus tokenizer, model checkpoint and model-training run remain future execution work.
+Environment scope alada: backend `.venv` remains without PyTorch; isolated `.venv-training` has verified Torch 2.11.0 CPU and Transformers 4.57.6. RTX 3060 / 12 GiB driver visible, but CUDA installation timed out and GPU execution is unverified. The live corpus's existing tokenizer/sequence passed read-only smoke-source validation; no live model run was created automatically. Full-corpus model training remains future execution work.
 
-Latest verification (2026-11-14): 26 frontend tests + 69 backend tests pass, production build and dependency checks pass, and tokenizer/sequence workflows pass in desktop/mobile browser checks. Details: `artifacts/STEP_4_VERIFICATION.md`. Earlier correction, dataset and backend verification remain in their respective artifact notes.
+Latest verification (2026-11-15): **77 backend + 30 frontend + 10 numerical tests pass**, one CUDA test explicitly skipped; production build and both dependency checks pass. Real desktop/mobile browser checks cover config → CPU training → checkpoint download/reload/resume. Details: `artifacts/STEP_5_VERIFICATION.md`. Earlier verification remains in its respective artifact notes.
 
 ## 3. Kototuku baki?
 
 - Initial app foundation ebong project/environment management complete.
-- Nicher revised roadmap-e **7-ti milestone baki**: 3-ti feature-building milestone, tarpor 4-ti heavier execution milestone. M3 Datasets and M4 tokenizer/sequences complete.
-- Model Config, Pre-training, Evaluation, Fine-tuning ebong Playground-er functional workflows baki. Those sidebar entries remain planned; Datasets and Tokenizer are functional.
-- **Actual model training ekhono shuru hoyni.** Training project-er scope, data sources, permission ebong acceptance criteria user-keo fill/confirm korte hobe; UI complete howa diye ei decisions automatically complete hoy na.
+- M3, M4 and bounded M5 complete. M6, M8 and M9 partially delivered by the CPU smoke workflow; M7, M10 and M11 remain future work. Counts do not represent effort percentages.
+- Model Config and Pre-training smoke controls are functional. Evaluation, Fine-tuning and Playground remain planned.
+- **Isolated numerical model training is verified; live/full-corpus pre-training has not started.** Project scope, corpus quality, permissions, capacity and acceptance criteria still need final review before larger execution.
 - Time/effort-er percentage ekhon reliable na: dataset size, final model size ebong pilot throughput jana nei. Milestone count-ke elapsed-time ba total-effort percentage hisebe dhorbo na.
 
 ## 4. Phase A — Age lightweight feature development
@@ -78,32 +80,32 @@ Latest verification (2026-11-14): 26 frontend tests + 69 backend tests pass, pro
 
 **Deferred:** Full training corpus-er final tokenizer run ebong whole-corpus tokenization.
 
-### M5 — Model Config screen + configuration persistence
+### M5 — Model Config screen + configuration persistence (bounded scope complete: 2026-11-15)
 
-- [ ] Layers, hidden size, attention heads, vocabulary ebong context length fields.
-- [ ] Optimizer, learning rate, warmup, batch size, gradient accumulation ebong precision fields.
-- [ ] Architecture consistency checks, jemon hidden size attention-head count diye divisible kina.
-- [ ] Dataset/tokenizer version references, random seed ebong checkpoint/log settings.
-- [ ] PostgreSQL-e versioned config save/load ebong export.
-- [ ] Estimated parameter/memory values thakle assumptions-shoho estimate label deya.
+- [x] Layers, hidden size, attention heads; source-derived read-only vocabulary/context.
+- [x] Learning rate, steps and device fields; fixed AdamW/FP32/batch-1/no-warmup smoke preset recorded explicitly.
+- [x] Architecture consistency, parameter/storage caps and generation-context validation.
+- [x] Dataset/tokenizer/sequence references, random seed and fixed checkpoint/log policy.
+- [x] PostgreSQL immutable revisions, save/load/export and unsaved-edit protection.
+- [x] Labeled parameter/storage estimates; actual parameter count measured by executor.
 
 **Done when:** Configuration validate/save/reload kora jay. Hardware capacity ba final model size ekhane verified bole claim kora hobe na.
 
-**Deferred:** Real model initialization ebong GPU memory measurement.
+**Verified:** CPU initialization is delivered through the smoke executor. **Deferred:** broader architectures/optimizers, mixed precision and measured GPU memory.
 
 ### M6 — Training controls + job infrastructure
 
 - [ ] Pre-training ebong fine-tuning-er alada configuration screens.
-- [ ] Job records, status transitions, logs, progress ebong output/checkpoint references-er API contract.
-- [ ] Background execution, cancellation ebong failure recovery-er infrastructure.
-- [ ] Small non-training task diye real job lifecycle test.
-- [ ] Training controls-er capability/readiness gate; executor na thakle clear unavailable state.
+- [x] Smoke job records, real metrics/logs/progress and output/checkpoint API.
+- [x] Single-worker background execution, cancellation and lease recovery.
+- [x] Queued lifecycle, real sleeping-child cancellation and timeout tests.
+- [x] Training-runtime readiness gate with missing-runtime/device errors.
 - [ ] Fine-tuning dataset schema, role/chat template, assistant-only loss-mask configuration ebong preview rules.
-- [ ] Checkpoint list/resume controls-er UI contract; real checkpoint na thakle empty state.
+- [x] Actual checkpoint list/download/reload/resume controls and empty states.
 
 **Done when:** Job infrastructure independently test kora jay ebong training UI saved configurations use kore. Actual training executor baki thakle screen-e seta explicitly dekhay; fake loss/progress dekhay na.
 
-**Deferred:** PyTorch training executor, GPU smoke test, real checkpoint creation/resume ebong actual SFT processing run.
+**Delivered:** Bounded real CPU executor/checkpoints. **Deferred:** CUDA execution verification, full training controls and actual SFT processing.
 
 ### M7 — Evaluation + Playground UI/API preparation
 
@@ -121,8 +123,9 @@ Latest verification (2026-11-14): 26 frontend tests + 69 backend tests pass, pro
 
 ### M8 — Real training environment + full data/tokenizer preparation
 
-- [ ] Python/PyTorch/CUDA compatibility verify kore backend/training environment-er dependency versions select/pin.
-- [ ] Compatible PyTorch ebong core training libraries install; GPU detection verify.
+- [x] Isolated Python/PyTorch CPU compatibility, pinned training libraries and explicit setup.
+- [x] CPU training runtime installed; real forward/backward verified separately from API runtime.
+- [ ] Compatible CUDA runtime install and actual GPU forward/backward/training verification.
 - [ ] Data source permissions, project scope, budget ebong success criteria finalize.
 - [ ] Full corpus import/cleaning/deduplication ebong leakage-resistant document-level splits.
 - [ ] Near-deduplication proyojon hole full-run resource budget-er moddhe add kora.
@@ -134,11 +137,12 @@ Latest verification (2026-11-14): 26 frontend tests + 69 backend tests pass, pro
 ### M9 — Model initialization + real smoke test
 
 - [ ] Hardware/data budget onujayi final small model configuration select.
-- [ ] Random-weight model initialize ebong parameter count verify.
-- [ ] Real training executor integrate; causal labels, padding masks ebong finite gradients verify.
-- [ ] Tiny subset-e short run kore loss decrease check.
-- [ ] Measured VRAM, tokens/second ebong step time record.
-- [ ] Real checkpoint save/reload/resume ebong generation check.
+- [x] Random-weight fixture model initialization and measured parameter count.
+- [x] Real CPU executor, causal labels, padding masks and finite gradients.
+- [x] Fixed tiny training subset loss decreases; diagnostic verdict recorded.
+- [x] CPU RSS, target tokens/second and step time recorded.
+- [ ] Actual CUDA peak allocated/reserved VRAM measured (implementation present, runtime unverified).
+- [x] Real checkpoint save, fresh-process reload, exact-state CPU resume and bounded generation.
 - [ ] Measured pilot throughput diye full training time/cost estimate update.
 
 **Done when:** Numerical stability, memory behavior ebong checkpoint resume pass. Fail hole fix kore tarpor full pre-training.
@@ -202,15 +206,17 @@ Prottek milestone complete hole ei file-e corresponding checklist ebong completi
 | FastAPI/PostgreSQL/Environment (Step 2) | Complete |
 | M3 Datasets | Complete — small-sample pipeline verified |
 | M4 Tokenizer + sequences | Complete — bounded sample pipeline verified |
-| M5 Model Config | Not started — next |
-| M6 Training/job infrastructure | Not started |
+| M5 Model Config | Complete — bounded smoke preset |
+| M6 Training/job infrastructure | Smoke workflow verified; fine-tuning/full-run controls pending |
 | M7 Evaluation/Playground preparation | Not started |
-| M8 Full environment/data preparation | Not started |
-| M9 Model smoke test | Not started |
+| M8 Full environment/data preparation | CPU runtime ready; CUDA/full-corpus preparation pending |
+| M9 Model smoke test | CPU fixture verified; target corpus/final capacity and CUDA pending |
 | M10 Pre-training/base evaluation | Not started |
 | M11 Fine-tuning/final inference | Not started |
 
 ## 8. Completion log
+
+2026-11-15: Model Config and bounded CPU smoke workflow verified. 77 backend / 30 frontend / 10 numerical tests pass; one CUDA test skipped after dependency-download timeouts. Browser checks passed config saving/navigation protection, real training, lower same-subset loss, checkpoint download/reload/resume and mobile layout. Migrations 005/006 applied; live source artifacts passed read-only validation. No live model run was created automatically. Details: `artifacts/STEP_5_VERIFICATION.md`.
 
 2026-11-14: M4A/M4B complete. Reviewed-version selection, train-only byte-level BPE, exact encoding previews, cancellable native jobs, fixed-length sequence exports and ZIP downloads verified with 69 backend / 26 frontend tests and a real desktop/mobile browser workflow. The live 27-page reviewed source passed read-only validation. No full-corpus tokenizer run or model training was started.
 
