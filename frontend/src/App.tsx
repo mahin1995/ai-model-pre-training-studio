@@ -612,7 +612,7 @@ export default function App() {
                               : page === "Model Config"
                                 ? "Configure a tiny model using your saved tokenizer and training sequences."
                                 : page === "Pre-training"
-                                  ? "Verify real training, numerical stability and checkpoints with a bounded smoke test."
+                                  ? "Run bounded smoke checks or train every selected block in an epoch-based pilot."
                                   : page === "Evaluation"
                                     ? "Compare saved checkpoints on fixed prompts and clearly scoped evaluation data."
                                     : page === "Playground"

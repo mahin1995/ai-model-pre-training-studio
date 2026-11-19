@@ -2644,3 +2644,7 @@ h1 {
 .annotation-editor { display: grid; gap: 13px; padding-top: 12px; }
 .inference-page .tokenizer-checksum, .inference-page code { overflow-wrap: anywhere; }
 @media (max-width: 750px) { .inference-comparison { grid-template-columns: minmax(0, 1fr); } }
+
+.pilot-preview { display: block; }
+.pilot-preview p { margin: 0; }
+.pilot-preview p + p { margin-top: 0.45rem; }

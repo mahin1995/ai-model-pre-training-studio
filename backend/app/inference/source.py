@@ -35,7 +35,7 @@ def checkpoint_snapshot(conn, root, project_id, checkpoint_ids):
         rows.append({'id':str(row['id']),'step':row['step'],'storage_key':row['storage_key'],'manifest':row['manifest']})
     current_permission(conn,parent['source_snapshot'])
     return {'trainingRunId':str(parent['id']),'configuration':parent['configuration'],
-            'trainingSource':parent['source_snapshot'],'trainingReport':parent['manifest']['report'],
+            'trainingKind':parent['training_kind'], 'trainingSource':parent['source_snapshot'],'trainingReport':parent['manifest']['report'],
             'checkpoints':sorted(rows,key=lambda r:r['step'])}
 
 
@@ -112,7 +112,8 @@ def prepare_inputs(root,snapshot,settings):
     sequence=original['sequence']
     training_docs=load_documents(root,original['dataset'])
     train_docs=[d for d in training_docs if d['split']=='train']
-    result['subsetRecords']=inspected['subset']
+    pilot = config.get('trainingKind') == 'pilot'
+    result['subsetRecords']=inspected['trainingRecords'] if pilot else inspected['subset']
     if settings['metricScope']=='external':
         target=snapshot['externalSource']
         documents=load_documents(root,target)
@@ -138,7 +139,7 @@ def prepare_inputs(root,snapshot,settings):
         except ValueError as exc:raise DatasetError(str(exc)) from None
     result['records']=records
     if settings['metricScope']=='training':
-        result['warnings'].append('Training diagnostic only. All source train blocks include the smoke subset; other blocks from the same source are not independent held-out data.')
+        result['warnings'].append('Training diagnostic only. The pilot trained on all source train blocks.' if pilot else 'Training diagnostic only. All source train blocks include the smoke subset; other blocks from the same source are not independent held-out data.')
     elif not records:
         result['warnings'].append('Not available — add independent documents. No held-out loss/perplexity was computed.')
     result['warnings'].append('Block-based NLL/PPL v1: document-isolated non-overlapping blocks; not sliding-window corpus perplexity. Perplexity is not accuracy.')

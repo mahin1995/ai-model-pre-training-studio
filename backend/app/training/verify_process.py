@@ -14,7 +14,8 @@ def main(directory):
     config = json.loads((directory/'configuration.json').read_text())
     request = json.loads((directory/'request.json').read_text())
     result = json.loads((directory/'training-result.json').read_text())
-    records = [json.loads(line) for line in (directory/'subset.jsonl').read_text().splitlines()]
+    filename = 'train.jsonl' if config.get('trainingKind') == 'pilot' else 'subset.jsonl'
+    records = [json.loads(line) for line in (directory/filename).read_text().splitlines()]
     torch.set_num_threads(2)
     model, _, _ = load_checkpoint(Path(result['finalCheckpoint']), config, request['sourceIdentity'], request['device'])
     reference = torch.load(directory/'reload-reference.pt', weights_only=True, map_location='cpu')
@@ -39,7 +40,7 @@ def main(directory):
             raise ValueError('Generation produced invalid output IDs.')
     write_json(directory/'verification.json', {'reloadMatches': True, 'tolerance': tolerance,
         'generationValid': True, 'sample': {'prompt': config['prompt'], 'tokenIds': full,
-        'newTokenIds': full[len(ids):], 'text': tokenizer.decode(full[len(ids):], skip_special_tokens=True)}})
+        'newTokenIds': full[len(ids):], 'text': tokenizer.decode(full[len(ids):], skip_special_tokens=True).replace('\x00', r'\u0000')}})
 
 
 if __name__ == '__main__':

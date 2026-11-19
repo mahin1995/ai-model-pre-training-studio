@@ -55,7 +55,7 @@ def inspect_source(root, snapshot, config=None):
         raise DatasetError('Model configuration does not match tokenizer/sequence artifacts.')
     expected = {d['documentId']: {'document': d, 'ids': [2]+tokenizer.encode(d['text'], add_special_tokens=False).ids+[3], 'cursor': 0}
                 for d in documents if d['split'] == 'train'}
-    selected, count = [], 0
+    selected, records, count = [], [], 0
     for record in read_jsonl(verified_artifact(root, sequence, 'train')):
         try:
             validate_record(record, vocab, length)
@@ -73,13 +73,19 @@ def inspect_source(root, snapshot, config=None):
         source['cursor'] += n
         if len(selected) < 2:
             selected.append(record)
+        if len(records) < 256:
+            records.append(record)
         count += 1
     if not selected or count != sequence['manifest']['counts']['train']['sequences'] or any(d['cursor'] != len(d['ids']) for d in expected.values()):
         raise DatasetError('Training sequence coverage/count is inconsistent.')
+    if config and config.get('trainingKind') == 'pilot':
+        from ..training.pilot import record_identity
+        if count > 256 or count != config['trainingBlocks'] or record_identity(records) != config['recordsSha256']:
+            raise DatasetError('Pilot full training coverage differs from the saved configuration.')
     if config and len(tokenizer.encode(config['prompt'], add_special_tokens=False).ids)+1+32 > length:
         raise DatasetError('Generation prompt is too long for this context. Use a shorter prompt.')
     return {'vocabSize': vocab, 'contextLength': length, 'subset': selected, 'trainingSequences': count,
-            'tokenizerPath': tokenizer_path}
+            'tokenizerPath': tokenizer_path, 'trainingRecords': records}
 
 
 def current_permission(conn, snapshot):

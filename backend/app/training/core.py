@@ -13,6 +13,7 @@ import torch
 from transformers import GPT2Config, GPT2LMHeadModel
 
 from .data import describe, digest, validate_record, write_json
+from .pilot import coverage, epoch_order, record_identity
 
 
 def versions():
@@ -67,7 +68,7 @@ def step_model(model, optimizer, record, device):
     return loss.item(), norm.item()
 
 
-def save_checkpoint(model, optimizer, directory, step, config, identity, device, initial_loss, subset_size):
+def save_checkpoint(model, optimizer, directory, step, config, identity, device, initial_loss, subset_size, progress=None):
     temporary = directory / f'.tmp-{step}'
     final = directory / f'step-{step:06d}'
     temporary.mkdir(parents=True, exist_ok=False)
@@ -80,13 +81,15 @@ def save_checkpoint(model, optimizer, directory, step, config, identity, device,
              'pythonRng': random.getstate(), 'initialLoss': initial_loss, 'configHash': config_hash(config),
              'sourceIdentity': identity, 'versions': versions(), 'device': device,
              'deviceName': torch.cuda.get_device_name(0) if device == 'cuda' else 'CPU',
-             'configuration': config, 'schedule': schedule, 'subsetSize': subset_size, 'subsetCursor': step % subset_size}
+             'configuration': config, 'schedule': schedule}
+    cursor = {'checkpointVersion': 2, 'trainingKind': 'pilot', 'coverage': progress} if progress is not None else {'subsetSize': subset_size, 'subsetCursor': step % subset_size}
+    state.update(cursor)
     torch.save(state, temporary / 'training-state.pt')
     files = {p.name: describe(p) for p in temporary.iterdir() if p.is_file()}
     write_json(temporary / 'checkpoint.json', {'step': step, 'configHash': config_hash(config),
                'sourceIdentity': identity, 'versions': versions(), 'device': device,
                'deviceName': state['deviceName'], 'schedule': schedule,
-               'subsetSize': subset_size, 'subsetCursor': state['subsetCursor'], 'files': files})
+               **cursor, 'files': files})
     temporary.rename(final)
     return final
 
@@ -119,9 +122,14 @@ def load_checkpoint(path, config, identity, device):
 def execute(directory, checkpoints, emit):
     config = json.loads((directory/'configuration.json').read_text())
     request = json.loads((directory/'request.json').read_text())
-    records = [json.loads(line) for line in (directory/'subset.jsonl').read_text().splitlines()]
-    if not records or len(records) > 2:
-        raise ValueError('Expected one or two fixed training sequences.')
+    pilot = config.get('trainingKind') == 'pilot'
+    filename = 'train.jsonl' if pilot else 'subset.jsonl'
+    records = [json.loads(line) for line in (directory/filename).read_text().splitlines()]
+    if not records or len(records) > (256 if pilot else 2):
+        raise ValueError('Training block count exceeds the selected mode limit.')
+    if pilot and (len(records) != config['trainingBlocks'] or record_identity(records) != config['recordsSha256']
+                  or config['maxSteps'] != len(records) * config['epochs'] or config['device'] != 'cpu' or config['maxSteps'] > 2000):
+        raise ValueError('Pilot source, total epochs or CPU configuration is inconsistent.')
     targets = [validate_record(r, config['vocabSize'], config['contextLength']) for r in records]
     device = request['device']
     if device not in ('cpu', 'cuda'):
@@ -143,7 +151,11 @@ def execute(directory, checkpoints, emit):
     if request.get('resumePath'):
         model, optimizer, state = load_checkpoint(Path(request['resumePath']), config, identity, device)
         start_step, initial_loss = state['step'], state['initialLoss']
-        if state['subsetSize'] != len(records) or state['subsetCursor'] != start_step % len(records):
+        if pilot:
+            expected = coverage(start_step, records, config['seed'], config['recordsSha256'])
+            if state.get('checkpointVersion') != 2 or state.get('trainingKind') != 'pilot' or state.get('coverage') != expected:
+                raise ValueError('Checkpoint pilot order/coverage differs from this run.')
+        elif state.get('subsetSize') != len(records) or state.get('subsetCursor') != start_step % len(records):
             raise ValueError('Checkpoint subset size/cursor differs from this run.')
     else:
         model = new_model(config).to(device)
@@ -157,26 +169,31 @@ def execute(directory, checkpoints, emit):
     measured = sum(p.numel() for p in model.parameters())
     if measured != config['estimatedParameters']:
         raise ValueError('Measured model size differs from validated configuration.')
-    emit({'stage': 'training', 'step': start_step, 'maxSteps': config['maxSteps'], 'initialLoss': initial_loss,
+    initial_coverage = coverage(start_step, records, config['seed'], config['recordsSha256']) if pilot else {}
+    emit({'stage': 'training', **{k: v for k, v in initial_coverage.items() if k not in ('order', 'recordsSha256', 'nextOffset')}, 'step': start_step, 'maxSteps': config['maxSteps'], 'initialLoss': initial_loss,
           'startLoss': resumed_start_loss, 'parameters': measured, 'device': device})
     last_checkpoint = None
     for index in range(start_step, config['maxSteps']):
         if time.monotonic() - started > config['timeLimitSeconds']:
-            raise ValueError('Smoke-test time limit exceeded; lower sequence length/model size or use a working GPU.')
+            raise ValueError('Training time limit exceeded; lower epochs or model size.')
         if device == 'cuda': torch.cuda.synchronize()
         tick = time.monotonic()
-        position = index % len(records)
+        epoch, offset = divmod(index, len(records))
+        position = epoch_order(len(records), config['seed'], epoch)[offset] if pilot else offset
         loss, gradient_norm = step_model(model, optimizer, records[position], device)
         if device == 'cuda': torch.cuda.synchronize()
         duration = time.monotonic() - tick
         step = index + 1
-        emit({'stage': 'training', 'step': step, 'maxSteps': config['maxSteps'], 'loss': loss,
+        progress = coverage(step, records, config['seed'], config['recordsSha256']) if pilot else None
+        live_coverage = {k: v for k, v in progress.items() if k not in ('order', 'recordsSha256', 'nextOffset')} if progress else {}
+        emit({'stage': 'training', **live_coverage, 'blockIndex': position, 'step': step, 'maxSteps': config['maxSteps'], 'loss': loss,
               'gradientNorm': gradient_norm, 'stepSeconds': duration, 'targetTokensPerSecond': targets[position]/duration,
               'rssBytes': psutil.Process().memory_info().rss,
               'cudaPeakAllocatedBytes': torch.cuda.max_memory_allocated() if device == 'cuda' else None,
               'cudaPeakReservedBytes': torch.cuda.max_memory_reserved() if device == 'cuda' else None})
-        if step % config['checkpointEvery'] == 0 or step == config['maxSteps']:
-            last_checkpoint = save_checkpoint(model, optimizer, checkpoints, step, config, identity, device, initial_loss, len(records))
+        save_now = step in config['checkpointSteps'] if pilot else step % config['checkpointEvery'] == 0 or step == config['maxSteps']
+        if save_now:
+            last_checkpoint = save_checkpoint(model, optimizer, checkpoints, step, config, identity, device, initial_loss, len(records), progress)
         if sum(p.stat().st_size for p in checkpoints.rglob('*') if p.is_file()) > 1024**3:
             raise ValueError('Checkpoint storage exceeded the 1 GiB run limit.')
     emit({'stage': 'verifying'})
@@ -194,5 +211,9 @@ def execute(directory, checkpoints, emit):
               'startingStep': start_step, 'subsetSequences': len(records), 'subsetTargets': sum(targets),
               'device': device, 'versions': versions(), 'finalCheckpoint': str(last_checkpoint),
               'trainingSeconds': time.monotonic()-started, 'scope': 'train-subset diagnostic; no held-out evaluation'}
+    if pilot:
+        result.pop('subsetSequences'); result.pop('subsetTargets')
+        result.update({'trainingKind': 'pilot', 'coverage': coverage(config['maxSteps'], records, config['seed'], config['recordsSha256']),
+                       'scope': 'all-train diagnostic; no held-out evaluation', 'epochs': config['epochs']})
     write_json(directory/'training-result.json', result)
     return result

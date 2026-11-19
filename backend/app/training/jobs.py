@@ -61,6 +61,7 @@ def publish_checkpoints(conn, root, run, checkpoints):
 
 
 def execute_smoke(conn, root, run, stopping):
+    pilot = run.get('training_kind') == 'pilot'
     final = storage_path(root, run['storage_key'])
     base, stage = final.parent, final.parent/'.tmp-results'
     checkpoints = base/'checkpoints'
@@ -76,7 +77,7 @@ def execute_smoke(conn, root, run, stopping):
         if not row or row['cancel_requested']:
             raise SmokeCancelled()
         if time.monotonic() > deadline:
-            raise DatasetError('Smoke-test time limit exceeded. Use shorter sequences, a smaller model or a working GPU.')
+            raise DatasetError('Training time limit exceeded. Reduce epochs, sequence length or model size.')
         conn.execute('UPDATE smoke_runs SET heartbeat_at=now(),metrics=%s'+(',status=%s' if status else '')+' WHERE id=%s',
                      (Jsonb(metrics), status, run['id']) if status else (Jsonb(metrics),run['id']))
 
@@ -111,6 +112,8 @@ def execute_smoke(conn, root, run, stopping):
         while process.poll() is None:
             heartbeat(consume_events())
             publish_checkpoints(conn, root, run, checkpoints)
+            if sum(p.stat().st_size for p in base.rglob('*') if p.is_file()) > MAX_BYTES:
+                raise DatasetError('Training artifacts exceeded the 1 GiB run limit.')
             stopping.wait(0.25)
         heartbeat(consume_events())
         publish_checkpoints(conn, root, run, checkpoints)
@@ -131,7 +134,7 @@ def execute_smoke(conn, root, run, stopping):
         stage.mkdir(parents=True, exist_ok=False)
         checkpoints.mkdir(parents=True, exist_ok=True)
         write_json(stage/'configuration.json', run['configuration'])
-        write_jsonl(stage/'subset.jsonl', source['subset'])
+        write_jsonl(stage/('train.jsonl' if pilot else 'subset.jsonl'), source['trainingRecords'] if pilot else source['subset'])
         saved = run['source_snapshot']['tokenizer']
         for key, filename in (('tokenizer','tokenizer.json'),('config','tokenizer_config.json'),('special_tokens','special_tokens_map.json')):
             shutil.copyfile(verified_artifact(root, saved, key), stage/filename)
@@ -149,17 +152,25 @@ def execute_smoke(conn, root, run, stopping):
         if not verification['reloadMatches'] or not verification['generationValid'] or result['completedSteps'] != run['configuration']['maxSteps']:
             raise DatasetError('Smoke-test verification did not complete successfully.')
         result.pop('finalCheckpoint', None)
-        verdict = 'passed' if result['lossDecreaseRatio'] >= 0.05 else 'needs-attention'
+        if pilot and (result['coverage']['completedEpochs'] != run['configuration']['epochs'] or result['coverage']['epochOffset'] != 0
+                      or result['coverage']['uniqueBlocksVisited'] != source['trainingSequences']):
+            raise DatasetError('Pilot did not cover every requested block/epoch.')
+        verdict = None if pilot else ('passed' if result['lossDecreaseRatio'] >= 0.05 else 'needs-attention')
         report = {**result, **verification, 'verdict': verdict, 'sourceIdentity':run['source_snapshot']['sourceIdentity'],
-                  'warnings':['Train-subset diagnostic only; no held-out evaluation was performed.']}
+                  'warnings':['All-train diagnostic only; no held-out evaluation was performed.' if pilot else 'Train-subset diagnostic only; no held-out evaluation was performed.']}
         write_json(stage/'report.json', report)
         write_json(stage/'sample.json', verification['sample'])
-        for private in ('request.json','subset.jsonl','reload-reference.pt','training-result.json','verification.json'):
+        if pilot:
+            write_json(stage/'coverage.json', result['coverage'])
+            (stage/'USAGE.txt').write_text('Whole-dataset CPU pilot. Use this bundle tokenizer with its model.\nLoad model weights from the final checkpoints/step-* directory using GPT2LMHeadModel.from_pretrained.\nTraining loss is a diagnostic; independent evaluation is separate.\nResume requires the original immutable configuration/source and runtime.\n', encoding='utf-8')
+        for private in ('request.json','subset.jsonl','train.jsonl','reload-reference.pt','training-result.json','verification.json'):
             (stage/private).unlink(missing_ok=True)
         artifacts = {key: describe(stage/filename) for key,filename in (('report','report.json'),('sample','sample.json'),
             ('metrics','metrics.jsonl'),('config','configuration.json'),('tokenizer','tokenizer.json'),
             ('tokenizer_config','tokenizer_config.json'),('special_tokens','special_tokens_map.json'))}
-        manifest = {'schemaVersion':1,'kind':'model-smoke-test','runId':str(run['id']), 'configuration':run['configuration'],
+        if pilot:
+            artifacts['coverage'] = describe(stage/'coverage.json')
+        manifest = {'schemaVersion':2 if pilot else 1,'kind':'whole-dataset-pilot' if pilot else 'model-smoke-test','runId':str(run['id']), 'configuration':run['configuration'],
             'source':{k:v for k,v in run['source_snapshot'].items() if k not in ('dataset','sequence','tokenizer')},
             'runtime':runtime,'verdict':verdict,'report':report,'artifacts':artifacts}
         write_json(stage/'manifest.json', manifest)
@@ -169,6 +180,7 @@ def execute_smoke(conn, root, run, stopping):
         artifacts['bundle'] = make_zip(stage/'bundle.zip', files)
         if sum(p.stat().st_size for p in base.rglob('*') if p.is_file()) > MAX_BYTES:
             raise DatasetError('Training artifacts exceeded the 1 GiB run limit.')
+        heartbeat('verifying')
         with conn.transaction():
             current = conn.execute('SELECT * FROM smoke_runs WHERE id=%s FOR UPDATE', (run['id'],)).fetchone()
             if current['cancel_requested']:

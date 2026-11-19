@@ -7,7 +7,7 @@ from psycopg.types.json import Jsonb
 
 from ..datasets.router import project_exists
 from ..datasets.storage import DatasetError
-from .schemas import ConfigCreate, configuration
+from .schemas import ConfigCreate, PilotConfigCreate, configuration, pilot_configuration
 from .source import inspect_source, take_snapshot
 
 router = APIRouter(prefix='/api/projects/{project_id}/model-configs', tags=['model-configuration'])
@@ -16,7 +16,7 @@ router = APIRouter(prefix='/api/projects/{project_id}/model-configs', tags=['mod
 def config_json(row):
     source = row['source_snapshot']
     return {'id':str(row['id']), 'projectId':str(row['project_id']), 'revision':row['revision'], 'name':row['name'],
-        'configuration':row['configuration'], 'source':{k:v for k,v in source.items() if k not in ('dataset','sequence','tokenizer')},
+        'trainingKind':row['training_kind'], 'configuration':row['configuration'], 'source':{k:v for k,v in source.items() if k not in ('dataset','sequence','tokenizer')},
         'createdAt':row['created_at'].isoformat()}
 
 
@@ -35,13 +35,18 @@ def list_configs(project_id: UUID, request: Request):
 
 
 @router.post('', status_code=201)
-def create_config(project_id: UUID, body: ConfigCreate, request: Request):
+def create_config(project_id: UUID, body: ConfigCreate | PilotConfigCreate, request: Request):
     with request.app.state.pool.connection() as conn:
         project_exists(conn, project_id)
         snapshot = take_snapshot(conn, request.app.state.data_root, project_id, body.sequenceRunId)
         try:
             source = inspect_source(request.app.state.data_root, snapshot)
-            config = configuration(body.settings.model_dump(), source['vocabSize'], source['contextLength'])
+            if body.trainingKind == 'pilot':
+                if source['trainingSequences'] > 256:
+                    raise ValueError('Pilot supports at most 256 train blocks; no blocks were sampled.')
+                config = pilot_configuration(body.settings.model_dump(), source['vocabSize'], source['contextLength'], source['trainingRecords'])
+            else:
+                config = configuration(body.settings.model_dump(), source['vocabSize'], source['contextLength'])
             inspect_source(request.app.state.data_root, snapshot, config)
         except (ValueError, OSError) as exc:
             raise HTTPException(409, str(exc) if isinstance(exc,ValueError) else 'Saved source files are unavailable.') from None
@@ -50,9 +55,9 @@ def create_config(project_id: UUID, body: ConfigCreate, request: Request):
             ON CONFLICT(project_id) DO UPDATE SET last_revision=model_config_revisions.last_revision+1 RETURNING last_revision''',
             (project_id,)).fetchone()['last_revision']
         row = conn.execute('''INSERT INTO model_configs(id,project_id,revision,name,dataset_id,dataset_version_id,
-            tokenizer_run_id,sequence_run_id,configuration,source_snapshot) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *''',
+            tokenizer_run_id,sequence_run_id,configuration,source_snapshot,training_kind) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *''',
             (uuid4(),project_id,revision,body.name,snapshot['datasetId'],snapshot['datasetVersionId'],snapshot['tokenizerRunId'],
-             body.sequenceRunId,Jsonb(config),Jsonb(snapshot))).fetchone()
+             body.sequenceRunId,Jsonb(config),Jsonb(snapshot),body.trainingKind)).fetchone()
         return config_json(row)
 
 
@@ -75,6 +80,6 @@ def delete_config(project_id: UUID, config_id: UUID, request: Request):
     with request.app.state.pool.connection() as conn:
         find_config(conn,project_id,config_id,lock=True)
         if conn.execute('SELECT 1 FROM smoke_runs WHERE model_config_id=%s',(config_id,)).fetchone():
-            raise HTTPException(409, 'Delete dependent smoke runs before deleting this configuration.')
+            raise HTTPException(409, 'Delete dependent training runs before deleting this configuration.')
         conn.execute('DELETE FROM model_configs WHERE id=%s',(config_id,))
     return {'deleted':True}

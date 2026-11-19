@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultSmokeSettings, smokeActive } from "../types/training";
-import { checkpointDownload, deleteModelConfig, deleteSmoke, listModelConfigs, modelConfigExport, saveModelConfig, smokeAction, smokeDownload, smokeMetrics, startSmoke, trainingRuntime } from "./training";
+import { checkpointDownload, deleteModelConfig, deleteSmoke, listModelConfigs, modelConfigExport, saveModelConfig, smokeAction, smokeDownload, smokeMetrics, startSmoke, trainingRuntime, pilotPreview, listSmokeRuns } from "./training";
 afterEach(() => vi.unstubAllGlobals());
 describe("model and smoke-training API", () => {
   it("saves source references and settings without inventing vocabulary/context", async () => {
@@ -35,5 +35,27 @@ describe("model and smoke-training API", () => {
     expect(smokeActive({ status: "initializing" })).toBe(true);
     expect(smokeActive({ status: "verifying" })).toBe(true);
     expect(smokeActive({ status: "completed" })).toBe(false);
+  });
+});
+
+describe("whole-dataset pilot API", () => {
+  it("saves epochs while excluding smoke-only steps and previews without starting", async () => {
+    const fetcher = vi.fn().mockImplementation(async () => Response.json({})); vi.stubGlobal("fetch", fetcher);
+    await saveModelConfig("p", { name: "Pilot", sequenceRunId: "s", trainingKind: "pilot", settings: { ...defaultSmokeSettings, device: "cpu", epochs: 3 } });
+    const body = JSON.parse(fetcher.mock.calls[0][1].body);
+    expect(body.trainingKind).toBe("pilot"); expect(body.settings.epochs).toBe(3);
+    expect(body.settings).not.toHaveProperty("maxSteps");
+    await pilotPreview("p", "c");
+    expect(fetcher.mock.calls[1][0]).toBe("/api/projects/p/pilot-preview");
+    expect(JSON.parse(fetcher.mock.calls[1][1].body)).toEqual({ modelConfigId: "c" });
+  });
+  it("uses pilot lifecycle, metrics and protected download routes", async () => {
+    const fetcher = vi.fn().mockImplementation(async () => Response.json({})); vi.stubGlobal("fetch", fetcher);
+    await listSmokeRuns("p", undefined, "pilot"); await startSmoke("p", "c", "pilot");
+    await smokeAction("p", "r", "resume", "cp", "pilot"); await smokeMetrics("p", "r", 600, undefined, "pilot");
+    expect(fetcher.mock.calls.map((c) => c[0])).toEqual(["/api/projects/p/pilot-runs", "/api/projects/p/pilot-runs", "/api/projects/p/pilot-runs/r/resume", "/api/projects/p/pilot-runs/r/metrics?afterStep=600"]);
+    expect(smokeDownload("p", "r", "coverage", "pilot")).toBe("/api/projects/p/pilot-runs/r/download?artifact=coverage");
+    expect(checkpointDownload("p", "r", "cp", "pilot")).toBe("/api/projects/p/pilot-runs/r/checkpoints/cp/download");
+    await deleteSmoke("p", "r", "pilot"); expect(fetcher.mock.calls.at(-1)?.[1].method).toBe("DELETE");
   });
 });

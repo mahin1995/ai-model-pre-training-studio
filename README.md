@@ -218,6 +218,19 @@ Training shares the existing single-worker preparation lock. Cancellation termin
 
 Bounds: 50–500 steps, up to 15 minutes, at most 10 million model parameters, 1 GiB outputs, 2 GiB available RAM and 5 GiB free artifact disk. Conservative checkpoint/bundle estimates may reject large combinations before launch. Real memory fit is checked by execution. CUDA installation was not completed during verification because wheel downloads timed out; CPU training/reload/resume passed. See [smoke-test verification](artifacts/STEP_5_VERIFICATION.md).
 
+## Whole-dataset pilot training
+
+1. In **Model Config**, choose **Whole-dataset pilot**, a reviewed sequence export, tiny architecture and epochs (default **3**). CPU/FP32 is fixed for this phase. Save a new immutable revision.
+2. In **Pre-training**, select **Whole-dataset pilot** under Run mode. The execution preview validates every training block and shows document/block counts, supervised targets per epoch, derived updates, checkpoint steps and estimated storage. Preview and config saving do not start training.
+3. **Check training runtime**, then **Start pilot**. Each epoch visits every train block once in a reproducible seeded order. For seven blocks, three epochs mean **21 updates**. Fresh pilots initialize random weights; they do not continue smoke weights.
+4. Watch completed epochs, current epoch offset, unique blocks visited and cumulative target exposures. More epochs increase repeated exposures, not corpus size. Initial/final losses are token-weighted all-train diagnostics with no weight updates during scoring. Completion requires coverage, finite gradients, changed weights and verified reload; there is no loss-reduction quality verdict.
+5. Download the bundle, coverage report and up to four epoch-boundary checkpoints. **Resume pilot** creates a linked child using the same source/config/runtime and remaining original epoch budget. Published intermediate checkpoints from completed, failed or cancelled pilots are eligible. Retry starts fresh; a final checkpoint cannot extend epochs.
+6. Open **Evaluation** or **Playground** to use completed pilot checkpoints. Evaluation labels their original full-train score correctly; old smoke runs retain their subset score. Empty validation remains unavailable. Independent reviewed documents can be evaluated with the existing frozen-tokenizer workflow.
+
+Bounds: 1–20 epochs, all 1–256 training blocks, at most 2,000 updates, 900 seconds, 10 million parameters and 1 GiB total run artifacts. Oversized plans fail without sampling or silently shortening epochs. Checkpoints retain weights, optimizer, RNG, actual epoch order/cursor and source hashes. Source corrections require a new reviewed version/tokenizer/sequences/config. Existing artifacts stay intact.
+
+This is a small-corpus pilot, not a guarantee of language or factual quality. CUDA pilot training, warm starts from smoke checkpoints, epoch-budget extension, automatic best-checkpoint ranking and fine-tuning remain separate work. See [pilot plan](STEP_7_WHOLE_DATASET_PILOT_PLAN.md) and [verification](artifacts/STEP_7_VERIFICATION.md).
+
 ## Checkpoint Playground and Evaluation
 
 **Playground** runs plain text completion on a saved CPU-trained checkpoint. Choose a completed training run/checkpoint, enter a prompt and select 8/16/32/64/128 new tokens. The live preview shows prompt tokens plus BOS and remaining context. Prompts are limited to 4 KiB UTF-8; context overflow is rejected without truncation. Greedy decoding uses the exact frozen tokenizer, stops on EOS and suppresses generated PAD/UNK/BOS. Final checkpoint selection is a convenient default, not a quality ranking.
@@ -228,7 +241,7 @@ Results are saved automatically with checkpoint/tokenizer hashes, raw generated 
 
 Choose an explicit metric source:
 
-- **All original train blocks:** scores every selected-source train block, plus a separate score for the original smoke subset. The remaining blocks from the same PDF are not an independent held-out set.
+- **All original train blocks:** scores every selected-source train block, plus a separate original-trained-data score: the smoke subset for smoke runs, all training blocks for pilots. The remaining blocks from the same PDF are not an independent held-out set.
 - **Original validation split:** scores a nonempty held-out split. If empty, numerical metrics remain **Not available**, while prompt comparisons can still run.
 - **Independent reviewed external corpus:** select a reviewed version with confirmed source permission. It is encoded using the checkpoint tokenizer with no refitting, even if its original dataset export labels its records `train`. Known dataset/file/document/group/content overlap is blocked. Exact checks do not rule out near-duplicates; review independence manually.
 
@@ -294,6 +307,10 @@ Model/training endpoints (prefix `/api/projects/{project_id}`):
 
 - `GET/POST /model-configs`: list / save `{sequenceRunId, name, settings}`; `GET /model-configs/{id}`, `GET /model-configs/{id}/export`, `DELETE /model-configs/{id}`.
 - `GET /training-runtime?refresh=true`: scoped import/CPU/CUDA execution checks, up to 60 seconds.
+- `POST /model-configs` also accepts `{trainingKind: "pilot", sequenceRunId, name, settings: {epochs, device: "cpu", ...}}`; omit smoke-only `maxSteps`.
+- `POST /pilot-preview` with `{modelConfigId}` validates and returns the full epoch/checkpoint plan without enqueueing.
+- `GET/POST /pilot-runs`, `GET /pilot-runs/{id}`: mode-scoped history/start/status. Cancel/retry/resume/delete/metrics/checkpoint-download routes mirror smoke routes.
+- `GET /pilot-runs/{id}/download?artifact=bundle|report|coverage|metrics|manifest` includes verified coverage and model/resume artifacts.
 - `GET/POST /smoke-runs`: list / queue `{modelConfigId}`; `GET /smoke-runs/{id}` includes durable metrics, verdict and registered checkpoints.
 - `GET /smoke-runs/{id}/metrics?afterStep=50`: bounded optimizer-step events; no fabricated progress.
 - `POST /smoke-runs/{id}/cancel`, `/retry`, `/resume` (body `{checkpointId}`), `DELETE /smoke-runs/{id}`.
@@ -324,3 +341,6 @@ Inference endpoints (same project prefix):
 - [Evaluation/Playground plan](STEP_6_EVALUATION_PLAYGROUND_PLAN.md)
 - [Evaluation/Playground verification](artifacts/STEP_6_VERIFICATION.md)
 - [Verification artifacts](artifacts/)
+
+- [Whole-dataset pilot plan](STEP_7_WHOLE_DATASET_PILOT_PLAN.md)
+- [Whole-dataset pilot verification](artifacts/STEP_7_VERIFICATION.md)
