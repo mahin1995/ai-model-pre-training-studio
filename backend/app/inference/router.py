@@ -40,7 +40,8 @@ def sources(project_id: UUID,request: Request):
         for run in runs:
             cps=conn.execute('SELECT * FROM smoke_checkpoints WHERE run_id=%s ORDER BY step',(run['id'],)).fetchall()
             result.append({'id':str(run['id']),'createdAt':run['created_at'].isoformat(),'status':run['status'],
-                'datasetName':run['source_snapshot']['datasetName'],'datasetVersion':run['source_snapshot']['datasetVersion'],
+                'datasetName':run['source_snapshot']['datasetName'],'currentDatasetName':run['metadata']['name'],
+                'datasetVersion':run['source_snapshot']['datasetVersion'],
                 'configuration':run['configuration'],'runtime':run['runtime_snapshot'],
                 'tokenizerSha256':run['source_snapshot']['tokenizer']['manifest']['artifacts']['tokenizer']['sha256'],
                 'trainingBlocks':run['source_snapshot']['sequence']['manifest']['counts']['train']['sequences'],

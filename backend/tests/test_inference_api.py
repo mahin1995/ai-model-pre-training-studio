@@ -67,6 +67,28 @@ def prompt_set(client,base):
     return response.json()
 
 
+def test_renamed_dataset_updates_inference_sources_without_changing_history(workspace):
+    client, data = workspace
+    original = client.get(data['dataset']).json()['metadata']
+    before = client.get(data['base'] + '/inference-sources').json()[0]
+    renamed = {**original, 'name': 'Renamed training dataset'}
+    try:
+        assert client.patch(data['dataset'], json=renamed).status_code == 200
+        after = client.get(data['base'] + '/inference-sources').json()[0]
+        assert after['currentDatasetName'] == renamed['name']
+        assert after['datasetName'] == before['datasetName'] == original['name']
+        assert after['datasetVersion'] == before['datasetVersion']
+        assert after['checkpoints'] == before['checkpoints']
+        config = client.get(data['base'] + '/model-configs/' + data['run']['modelConfigId']).json()
+        assert config['source']['datasetName'] == original['name']
+        other = client.post('/api/projects', json={'id': str(uuid4()), 'name': 'Other project'})
+        assert other.status_code == 201
+        sources = client.get('/api/projects/' + other.json()['id'] + '/inference-sources')
+        assert sources.status_code == 200 and sources.json() == []
+    finally:
+        assert client.patch(data['dataset'], json=original).status_code == 200
+
+
 def test_generation_prompt_budget_determinism_and_protected_deletion(workspace,test_database):
     client,data=workspace;base=data['base'];cp=data['run']['checkpoints'][-1]
     sources=client.get(base+'/inference-sources').json();assert sources[0]['trainingBlocks']>2
