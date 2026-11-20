@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { annotationExport, inferenceDownload, listAnnotations, saveAnnotation } from "../services/inference";
 import { inferenceActive, type Annotation, type Generation, type InferenceRun } from "../types/inference";
+import { GeneratedText } from "./GeneratedText";
 
 export function InferenceHistory({ runs, selected, onSelect }: { runs: InferenceRun[]; selected?: InferenceRun; onSelect: (id: string) => void }) {
   return <div className="tokenizer-run-list">{runs.map((r) => <button key={r.id} className={`card tokenizer-run-choice ${selected?.id === r.id ? "selected" : ""}`} aria-pressed={selected?.id === r.id} onClick={() => onSelect(r.id)}><strong>{r.kind === "generation" ? "Completion" : "Evaluation"} · {r.status}</strong><span>Step {r.checkpoints.map((c) => c.step).join(" / ")}</span><small>{new Date(r.createdAt).toLocaleString()}</small></button>)}</div>;
@@ -55,7 +56,7 @@ export function InferenceResults({ projectId, run, busy, onAction, onDirtyChange
 }
 
 function GenerationOutput({ value }: { value: Generation }) {
-  return <><pre className="inference-continuation">{value.text || "[EOS / empty continuation]"}</pre>{value.escapedNul && <p className="dataset-caption">NUL is escaped for display; raw token IDs preserve the output.</p>}<p className="dataset-caption">{value.generatedTokenCount} new tokens · {value.elapsedSeconds.toFixed(3)}s · {value.tokensPerSecond.toFixed(1)} tokens/s{value.stoppedOnEOS ? " · stopped on EOS" : ""}</p><details><summary>Raw generated token IDs</summary><pre className="inference-ids">{JSON.stringify(value.newTokenIds)}</pre></details></>;
+  return <><GeneratedText text={value.text} className="inference-continuation"/>{value.escapedNul && <p className="dataset-caption">NUL is escaped for display; raw token IDs preserve the output.</p>}<p className="dataset-caption">{value.generatedTokenCount} new tokens · {value.elapsedSeconds.toFixed(3)}s · {value.tokensPerSecond.toFixed(1)} tokens/s{value.stoppedOnEOS ? " · stopped on EOS" : ""}</p><details><summary>Raw generated token IDs</summary><pre className="inference-ids">{JSON.stringify(value.newTokenIds)}</pre></details></>;
 }
 
 function AnnotationEditor({ projectId, runId, checkpointId, promptIndex, saved, onDraft, onSaved }: { projectId: string; runId: string; checkpointId: string; promptIndex: number; saved?: Annotation; onDraft: (key: string, dirty: boolean) => void; onSaved: (saved: Annotation) => void }) {
@@ -76,7 +77,7 @@ function AnnotationEditor({ projectId, runId, checkpointId, promptIndex, saved, 
     catch (e) { setError(e instanceof Error ? e.message : "Could not save notes."); }
     finally { setBusy(false); }
   }
-  return <div className="annotation-editor"><p className="dataset-caption">Human observations; no automatic factual accuracy score.</p>
+  return <div className="annotation-editor"><p className="dataset-caption">Reviewer observations; no automatic factual accuracy score.</p>
     <label>Readability<select aria-label={`Readability ${key}`} disabled={busy} value={draft.readability} onChange={(e) => setDraft({ ...draft, readability: e.target.value as Annotation["readability"] })}><option value="not-reviewed">Not reviewed</option><option value="readable">Readable</option><option value="needs-review">Needs review</option></select></label>
     <label>Repetition<select aria-label={`Repetition ${key}`} disabled={busy} value={draft.repetition} onChange={(e) => setDraft({ ...draft, repetition: e.target.value as Annotation["repetition"] })}><option value="not-reviewed">Not reviewed</option><option value="present">Present</option><option value="absent">Absent</option></select></label>
     <label>Agreement with source<select aria-label={`Source agreement ${key}`} disabled={busy} value={draft.sourceAgreement} onChange={(e) => setDraft({ ...draft, sourceAgreement: e.target.value as Annotation["sourceAgreement"] })}><option value="not-reviewed">Not reviewed</option><option value="matches-source">Matches reviewed source</option><option value="needs-review">Needs review</option></select></label>

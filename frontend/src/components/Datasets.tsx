@@ -323,7 +323,7 @@ function DatasetWorkspace({ projectId, onDirtyChange }: { projectId: string; onD
     event.preventDefault();
     setError("");
     if (!files.length || files.length > 20) {
-      setError("Choose between 1 and 20 TXT/JSONL/PDF files.");
+      setError("Choose between 1 and 20 TXT/Markdown/JSONL/PDF files.");
       return;
     }
     if (files.reduce((sum, file) => sum + file.size, 0) > 20 * 1048576) {
@@ -524,7 +524,7 @@ function DatasetWorkspace({ projectId, onDirtyChange }: { projectId: string; onD
             <span className="eyebrow">START WITH A SMALL SAMPLE</span>
             <h2>Bring your text into the studio.</h2>
             <p>
-              TXT, JSONL or text-based PDF · up to 20 files · 20 MiB total · 10,000
+              TXT, Markdown, JSONL or text-based PDF · up to 20 files · 20 MiB total · 10,000
               documents
             </p>
           </div>
@@ -533,16 +533,16 @@ function DatasetWorkspace({ projectId, onDirtyChange }: { projectId: string; onD
               {metadataFields}
               <Field
                 label="Dataset files"
-                hint="TXT: one document per file. JSONL: one text record per line. PDF: one record per text page, up to 1,000 pages; scanned PDFs need OCR first. Maximum 1 MiB per document/record/page."
+                hint="TXT/Markdown: one document per file; Markdown syntax is kept as text. JSONL: one text record per line. PDF: one record per text page, up to 1,000 pages; scanned PDFs need OCR first. Maximum 1 MiB per document/record/page."
               >
                 {(id) => (
                   <div className="upload-zone">
                     <Upload size={26} />
-                    <strong>Choose your TXT / JSONL / PDF files</strong>
+                    <strong>Choose your TXT / Markdown / JSONL / PDF files</strong>
                     <input
                       id={id}
                       type="file"
-                      accept=".txt,.jsonl,.pdf"
+                      accept=".txt,.md,.markdown,.jsonl,.pdf"
                       multiple
                       required
                       onChange={(e) =>
@@ -1305,7 +1305,7 @@ function DatasetWorkspace({ projectId, onDirtyChange }: { projectId: string; onD
               <Upload size={38} />
               <h2>Your first dataset starts here.</h2>
               <p>
-                Import UTF-8 TXT, JSONL or text-based PDF files. Keep the first experiment
+                Import UTF-8 TXT, Markdown, JSONL or text-based PDF files. Keep the first experiment
                 small: up to 20 MiB and 10,000 documents.
               </p>
               <button className="secondary" onClick={openImport}>

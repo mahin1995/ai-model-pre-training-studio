@@ -1,0 +1,141 @@
+{
+  "baselineRunId": "09f2260f-9ed6-4b3d-a2f7-1cade911511a",
+  "datasetId": "e1c1a986-9907-4ba4-bd52-b781a51627aa",
+  "datasetVersionId": "2e1ad2ca-d81e-465f-b4fe-59fcd54c74ab",
+  "date": "2026-11-20",
+  "evaluationRunId": "0d38595c-f269-4b46-b7da-2ce44409e5e8",
+  "excludedFiles": [
+    {
+      "file": "doc/OM-D_Full_English.md",
+      "reason": "483 blocks exceed the 256-block evaluation cap; OCR-heavy conversion also requires separate review."
+    },
+    {
+      "file": "doc/OM-D_Training_Summary.md",
+      "reason": "Closely related training/PPC/absence content and source lineage; excluded from this first held-out corpus."
+    }
+  ],
+  "humanDomainReview": "pending",
+  "independenceReview": {
+    "exactOverlapChecks": "passed in existing external evaluation path",
+    "limitations": "Same airline/domain and shared terminology; lexical checks do not establish absence of paraphrases or expert approval.",
+    "manualScope": "Scheduling points and flight/duty-time sections, distinct from the PDF recent-experience explanation.",
+    "normalized8and12WordGramMatches": 0
+  },
+  "inputRepresentation": "UTF-8 Markdown kept as text; NFC/newline normalization and outer whitespace trim; no HTML stripping or whitespace collapsing",
+  "integrity": {
+    "frozenTokenizer": true,
+    "generatedProbesMatchBaseline": true,
+    "newTokenizerRuns": 0,
+    "newTrainingRuns": 0,
+    "originalMarkdownUnchanged": true,
+    "trainingSourceAndCheckpointsVerified": true
+  },
+  "interpretation": "External NLL improves from step 7 to 21 on these two English Markdown documents. This does not establish useful generation or broad factual/generalization quality.",
+  "metrics": [
+    {
+      "available": true,
+      "blocks": 28,
+      "documents": 2,
+      "loss": 6.911798383689874,
+      "perplexity": 1004.0512890819522,
+      "perplexityOverflow": false,
+      "step": 7,
+      "targetTokens": 27075
+    },
+    {
+      "available": true,
+      "blocks": 28,
+      "documents": 2,
+      "loss": 6.849646070397571,
+      "perplexity": 943.546898388736,
+      "perplexityOverflow": false,
+      "step": 14,
+      "targetTokens": 27075
+    },
+    {
+      "available": true,
+      "blocks": 28,
+      "documents": 2,
+      "loss": 6.799942679893937,
+      "perplexity": 897.795828423385,
+      "perplexityOverflow": false,
+      "step": 21,
+      "targetTokens": 27075
+    }
+  ],
+  "perDocument": [
+    {
+      "blocks": 2,
+      "filename": "section_4_4_scheduling.md",
+      "targetTokens": 1465,
+      "textSha256": "73fb5408632f0cd583cf51c753f6c5ba2f18c1a99b42553c62334369ad242602"
+    },
+    {
+      "blocks": 26,
+      "filename": "Section_7_Flight_and_Duty_Time.md",
+      "targetTokens": 25610,
+      "textSha256": "a856c60f73ca500974cc83add8cc1310110ad864c79b83aa926b2454ebfbe51c"
+    }
+  ],
+  "protocol": {
+    "blockLength": 1024,
+    "boundaries": "document isolated; one BOS/EOS; non-overlapping; right padded",
+    "name": "block-based NLL/PPL v1",
+    "targets": "model shifts once; ignore -100; first block token unpredicted"
+  },
+  "role": "external evaluation only; never used for fitting this model/tokenizer",
+  "schemaVersion": 1,
+  "selectedFiles": [
+    {
+      "blocks1024": 26,
+      "bytes": 50503,
+      "file": "doc/Section_7_Flight_and_Duty_Time.md",
+      "normalizedWordNgramHits": {
+        "12": 0,
+        "8": 0
+      },
+      "overlapExamples": {
+        "12": [],
+        "8": []
+      },
+      "sameSourceText": false,
+      "sha256": "aebcb93ef384ae97b69dbf48d50119515564ad4064255537b32b938eaefdaf34",
+      "tokensWithBoundaries": 25637
+    },
+    {
+      "blocks1024": 2,
+      "bytes": 3096,
+      "file": "doc/section_4_4_scheduling.md",
+      "normalizedWordNgramHits": {
+        "12": 0,
+        "8": 0
+      },
+      "overlapExamples": {
+        "12": [],
+        "8": []
+      },
+      "sameSourceText": false,
+      "sha256": "f5a9beacc4e99cad8f366ef8e33339c21692149fd17aa7250a8af5c31ef8e192",
+      "tokensWithBoundaries": 1468
+    }
+  ],
+  "tokenizerSha256": "c09acc9c34339181c09a18bf6d4a1b79fa5332c6b8a5e5f435934e53b1d5aa49",
+  "verification": {
+    "backendPassed": 93,
+    "backendSkipped": 1,
+    "browser": {
+      "blocksPerCheckpoint": 28,
+      "browserWorkflow": "passed",
+      "externalDatasetSelectable": true,
+      "externalRows": 3,
+      "markdownPicker": true,
+      "mobileOverflow": false,
+      "pageErrors": 0,
+      "resultDownload": true,
+      "selectedMarkdownFiles": 2,
+      "targetsPerCheckpoint": 27075
+    },
+    "frontendPassed": 36,
+    "productionBuild": "passed"
+  }
+}

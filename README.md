@@ -107,6 +107,19 @@ npm run build --prefix frontend
 
 Open http://127.0.0.1:8000 after restarting the backend with a build present. Hash-based UI routes work through the same server.
 
+### Run the full app with `uv`
+
+With `uv` installed, `.env` configured, and PostgreSQL running, execute this from the repository root:
+
+```bash
+npm ci --prefix frontend &&
+npm run build --prefix frontend &&
+uv run --no-project --with-requirements backend/requirements.txt \
+  python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
+```
+
+Open http://127.0.0.1:8000 for the app and http://127.0.0.1:8000/docs for the API docs. `uv` manages the Python environment automatically. To restart with the existing frontend build, rerun just the `uv run` command.
+
 ## Project behavior
 
 - Create, select, edit, and restore multiple projects from PostgreSQL. The latest updated project opens initially.
@@ -132,18 +145,18 @@ You can explicitly copy PyTorch-visible GPU details, RAM and free disk to a loca
 ## Datasets: prepare a small sample
 
 1. Save a project, open **Datasets**, and choose **Import dataset**.
-2. Enter its name, language, source, license/permission note and permission status. Upload UTF-8 TXT/JSONL or text-based PDF files.
+2. Enter its name, language, source, license/permission note and permission status. Upload UTF-8 TXT/Markdown/JSONL or text-based PDF files.
 3. Inspect **Overview** and **Preview**. Raw files remain intact; previews show up to 20 records per page and truncate long text at 4,000 characters. Downloads retain full text.
 4. Confirm source usage permission in Overview and save metadata. Confirmation is required before processing. Active jobs lock metadata edits; past versions retain their original metadata snapshot.
 5. In **Processing**, choose cleanup, deduplication, grouping, split percentages and seed. Review the summary, then start processing. Status updates every two seconds; cancellation and retry are available.
 6. In **Splits**, select a successful version and download JSONL splits, all processed records or the manifest. Reloading restores dataset/version records from PostgreSQL.
 7. To remove an accidental duplicate, open that dataset and choose **Delete upload**, then confirm. This permanently removes only that imported dataset, its processing history and saved versions; your original file and separately imported copies remain. Cancel or finish active processing first.
 
-Limits per import: **20 files, 20 MiB total, 10,000 documents**. A TXT file is one document; each non-empty JSONL line is one record. Each TXT document/JSONL line is limited to 1 MiB. Unsupported formats/encoding and invalid records are rejected with file/line errors. Use a small sample first; this version does not download remote datasets.
+Limits per import: **20 files, 20 MiB total, 10,000 documents**. A TXT or Markdown file is one document; each non-empty JSONL line is one record. Each TXT/Markdown document or JSONL line is limited to 1 MiB. Unsupported formats/encoding and invalid records are rejected with file/line errors. Use a small sample first; this version does not download remote datasets.
 
 **PDF import:** Selectable text is extracted page by page (maximum 1,000 pages, 1 MiB extracted text per page and 20 MiB extracted text per PDF). Original PDFs are preserved. Each text page becomes a record with its original page number; all pages of the same PDF are grouped together to prevent train/validation/test leakage, including repeated uploads of identical PDF bytes. A single PDF defaults to 100/0/0 splits in the UI. Textless pages are skipped and listed in Overview. Fully scanned/image-only, password-protected and corrupt PDFs are rejected with actionable messages. OCR is not included; run OCR externally before importing scanned files. Review Preview for extraction quality, especially complex layouts and tables.
 
-TXT files may contain multi-line text and an optional UTF-8 BOM. JSONL requires a string `text`; optional `source`, `language` and `group_id` must also be strings:
+TXT and Markdown (`.md`/`.markdown`) files may contain multi-line text and an optional UTF-8 BOM. Markdown headings, tables, code fences and indentation remain text; the importer does not render Markdown or execute code. JSONL requires a string `text`; optional `source`, `language` and `group_id` must also be strings:
 
 ```jsonl
 {"text":"বাংলা শেখার প্রথম উদাহরণ।","source":"Books","language":"bn","group_id":"book-1"}
@@ -251,6 +264,8 @@ Inference uses the existing single-worker queue and isolated `.venv-training` su
 
 See [Step 6 verification and screenshots](artifacts/STEP_6_VERIFICATION.md).
 
+Whitespace-only generated output is labeled explicitly in Evaluation, Playground and pre-training samples. Expand **Escaped generated text** to inspect line breaks/spaces/tabs; raw generated IDs and downloadable results retain the original output. The [Step 8 assessment](artifacts/STEP_8_EVALUATION_REVIEW.md) records the pilot's newline-only completions and its frozen-tokenizer evaluation on two user-supplied Markdown documents.
+
 ## Verify
 
 ```bash
@@ -344,3 +359,6 @@ Inference endpoints (same project prefix):
 
 - [Whole-dataset pilot plan](STEP_7_WHOLE_DATASET_PILOT_PLAN.md)
 - [Whole-dataset pilot verification](artifacts/STEP_7_VERIFICATION.md)
+
+- [Independent evaluation plan](STEP_8_INDEPENDENT_EVALUATION_PLAN.md)
+- [Step 8 baseline review](artifacts/STEP_8_EVALUATION_REVIEW.md)

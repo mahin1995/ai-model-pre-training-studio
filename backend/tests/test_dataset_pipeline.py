@@ -28,6 +28,26 @@ def test_utf8_bom_txt_is_one_document_and_jsonl_preserves_metadata(tmp_path):
     assert record["group_id"] == "book-1" and record["source"] == "Books" and record["language"] == "mixed"
 
 
+@pytest.mark.parametrize('extension', ['md', 'markdown', 'MD'])
+def test_markdown_preserves_tables_code_unicode_and_file_identity(tmp_path, extension, monkeypatch):
+    import app.datasets.importing as importing
+    path = tmp_path / ('manual.' + extension)
+    text = '# বাংলা manual\r\n\r\n| Term | Meaning |\r\n|---|---|\r\n| A | বিষয় |\r\n\r\n```python\r\n    print("sample")\r\n```\r\n'
+    original = b'\xef\xbb\xbf' + text.encode('utf-8')
+    path.write_bytes(original)
+    rows = list(records_from_file(path, path.name, 'markdown-file', META))
+    assert len(rows) == 1 and rows[0]['text'] == text
+    assert rows[0]['provenance'][0]['filename'] == path.name
+    assert path.read_bytes() == original
+    path.write_bytes(b'\xff')
+    with pytest.raises(DatasetError, match='UTF-8'):
+        list(records_from_file(path, path.name, 'markdown-file', META))
+    path.write_bytes(b'12345')
+    monkeypatch.setattr(importing, 'MAX_RECORD_BYTES', 4)
+    with pytest.raises(DatasetError, match='Markdown files are one document'):
+        list(records_from_file(path, path.name, 'markdown-file', META))
+
+
 @pytest.mark.parametrize("content,fragment", [(b'{bad}\n', 'line 1: invalid JSON'), (b'{"text":2}\n', 'string text'), (b'{"text":"x","group_id":2}\n','group_id must be a string'), (b'\xff','UTF-8'), (b'{"text":"\\ud800"}','invalid Unicode')])
 def test_import_reports_filename_and_line(tmp_path, content, fragment):
     path = tmp_path / "raw"; path.write_bytes(content)

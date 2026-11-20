@@ -96,6 +96,29 @@ def test_pdf_upload_preview_and_cleaning_end_to_end(dataset_client, test_databas
     assert version['manifest']['counts']['groups'] == 1
 
 
+def test_markdown_upload_process_and_review_preserve_documents(dataset_client, test_database):
+    client = dataset_client
+    base = new_project(client)
+    source = '# বাংলা\n\n| Item | Value |\n|---|---|\n| A | 123 |\n\n```text\n    indented code\n```'
+    response = client.post(base, data={'metadata': json.dumps(METADATA)},
+        files=[('files', ('manual.md', source.encode('utf-8'), 'text/markdown')),
+               ('files', ('second.markdown', b'# Second\n\nSeparate document.', 'text/markdown'))])
+    assert response.status_code == 201, response.text
+    detail = response.json()
+    assert detail['recordCount'] == 2 and [f['name'] for f in detail['files']] == ['manual.md', 'second.markdown']
+    path = base + '/' + detail['id']
+    records = client.get(path + '/preview').json()['records']
+    assert records[0]['text'] == source
+    assert records[0]['provenance'][0]['filename'] == 'manual.md'
+    response = client.post(path + '/process', json={'train': 100, 'validation': 0, 'test': 0})
+    assert response.status_code == 202, response.text
+    run_one(test_database, client.app.state.data_root)
+    version = client.get(path).json()['versions'][0]
+    rows = [json.loads(line) for line in client.get(path + f"/versions/{version['id']}/download?artifact=processed").text.splitlines()]
+    assert len(rows) == 2 and rows[0]['text'] == source
+    assert client.get(path + f"/versions/{version['id']}/corrections?page=1").json()['text'] == source
+
+
 @pytest.mark.parametrize('content,error', [(b'not a pdf', 'invalid or unreadable PDF')])
 def test_invalid_pdf_upload_returns_422_and_cleans_staging(dataset_client, content, error):
     client = dataset_client

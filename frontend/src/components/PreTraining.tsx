@@ -4,6 +4,7 @@ import type { Project } from "../types/project";
 import { smokeActive, type ModelConfig, type SmokeRun, type TrainingMetric, type TrainingRuntime as Runtime, type PilotPreview, type TrainingKind } from "../types/training";
 import { checkpointDownload, deleteSmoke, listModelConfigs, listSmokeRuns, smokeAction, smokeDownload, smokeMetrics, startSmoke, pilotPreview } from "../services/training";
 import { TrainingRuntime } from "./TrainingRuntime";
+import { GeneratedText } from "./GeneratedText";
 
 export function PreTraining({ project, onSetup, onConfig }: { project: Project | null; onSetup: () => void; onConfig: () => void }) {
   if (!project?.revision) return <section className="empty-card"><FlaskConical size={36}/><h2>Save a project first.</h2><button className="primary" onClick={onSetup}>Project setup</button></section>;
@@ -116,7 +117,7 @@ function RunDetails({ projectId, run, busy, onAction }: { projectId: string; run
       {pilot && <div className="training-actions"><a className="secondary" href="/#/evaluation">Open Evaluation</a><a className="secondary" href="/#/playground">Open Playground</a><a className="secondary" href={smokeDownload(projectId, run.id, "coverage", "pilot")}>Coverage report</a></div>}
       {report.warnings.map((w) => <p className="info-note" key={w}>{w}</p>)}
       <div className="training-actions">{[["bundle","Complete training bundle"],["report","Diagnostic report"],["metrics","Metrics JSONL"],["manifest","Manifest"]].map(([key, label]) => <a className="secondary" key={key} href={smokeDownload(projectId, run.id, key, run.trainingKind ?? "smoke")}><Download size={14}/>{label}</a>)}</div>
-      <details className="training-sample"><summary>Generated sample (pipeline check)</summary><p>Prompt: {report.sample.prompt}</p><pre>{report.sample.text || "[EOS / empty continuation]"}</pre><p className="dataset-caption">A small-corpus experiment does not establish readable or reliable output. Byte-level generation may produce incomplete characters.</p></details>
+      <details className="training-sample"><summary>Generated sample (pipeline check)</summary><p>Prompt: {report.sample.prompt}</p><GeneratedText text={report.sample.text}/><p className="dataset-caption">A small-corpus experiment does not establish readable or reliable output. Byte-level generation may produce incomplete characters.</p></details>
     </>}
     <div className="training-checkpoints"><h3>Verified checkpoints</h3>{!run.checkpoints.length && <p>{pilot ? "Checkpoints appear at the planned epoch boundaries and completion." : "Checkpoints appear after every 50 optimizer steps and at completion."}</p>}
       {run.checkpoints.map((c) => <div className="training-checkpoint" key={c.id}><a className="secondary" href={checkpointDownload(projectId, run.id, c.id, run.trainingKind ?? "smoke")}>Download step {c.step}</a><code>{c.sha256}</code></div>)}

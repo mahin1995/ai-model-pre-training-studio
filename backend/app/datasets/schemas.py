@@ -9,7 +9,7 @@ MAX_BYTES = 20 * 1024 * 1024
 MAX_RECORD_BYTES = 1024 * 1024
 MAX_DOCUMENTS = 10_000
 MAX_PDF_PAGES = 1_000
-SUPPORTED_EXTENSIONS = {".txt", ".jsonl", ".pdf"}
+SUPPORTED_EXTENSIONS = {".txt", ".md", ".markdown", ".jsonl", ".pdf"}
 ACTIVE = ("queued", "cleaning", "deduplicating", "splitting")
 RUNNING = ("cleaning", "deduplicating", "splitting")
 

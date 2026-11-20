@@ -10,13 +10,14 @@ from .storage import DatasetError, checksum
 def records_from_file(path: Path, filename: str, file_id: str, metadata: DatasetMetadata, info: dict | None = None):
     suffix = Path(filename).suffix.lower()
     if suffix not in SUPPORTED_EXTENSIONS:
-        raise DatasetError(f"{filename}: only TXT, JSONL and PDF files are supported.")
+        raise DatasetError(f"{filename}: only TXT, Markdown, JSONL and PDF files are supported.")
     if suffix == ".pdf":
         yield from records_from_pdf(path, filename, file_id, metadata, info)
         return
-    if suffix == ".txt":
+    if suffix in {".txt", ".md", ".markdown"}:
+        label = "TXT" if suffix == ".txt" else "Markdown"
         if path.stat().st_size > MAX_RECORD_BYTES:
-            raise DatasetError(f"{filename}, document 1: TXT files are one document and must not exceed 1 MiB.")
+            raise DatasetError(f"{filename}, document 1: {label} files are one document and must not exceed 1 MiB.")
         try:
             text = path.read_bytes().decode("utf-8-sig")
         except UnicodeDecodeError:

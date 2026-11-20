@@ -82,7 +82,7 @@ async def import_dataset(project_id: UUID, request: Request):
                 raise HTTPException(422, "Provide valid dataset metadata: name, language, source, licenseNote and permission.") from None
             files = form.getlist("files")
             if not files or len(files) > MAX_FILES or any(not isinstance(f, UploadFile) for f in files):
-                raise HTTPException(422, "Choose between 1 and 20 TXT/JSONL/PDF files.")
+                raise HTTPException(422, "Choose between 1 and 20 TXT/Markdown/JSONL/PDF files.")
             if any(key != "metadata" and key != "files" for key in form):
                 raise HTTPException(422, "Only metadata and files fields are accepted.")
             staging.mkdir(parents=True, exist_ok=False)
@@ -94,7 +94,7 @@ async def import_dataset(project_id: UUID, request: Request):
                     raise HTTPException(422, "Filenames must contain 1–200 printable characters.")
                 suffix = Path(name).suffix.lower()
                 if suffix not in SUPPORTED_EXTENSIONS:
-                    raise HTTPException(422, f"{name}: only TXT, JSONL and PDF files are supported.")
+                    raise HTTPException(422, f"{name}: only TXT, Markdown, JSONL and PDF files are supported.")
                 file_id = str(uuid4())
                 stored_name = f"{file_id}{suffix}"
                 size = 0

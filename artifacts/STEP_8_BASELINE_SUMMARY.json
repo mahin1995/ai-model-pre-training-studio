@@ -1,0 +1,183 @@
+{
+  "baselineRunId": "09f2260f-9ed6-4b3d-a2f7-1cade911511a",
+  "checkpoints": [
+    {
+      "id": "5e56cc03-3b6a-46d6-b9d8-6338e3c7c294",
+      "modelSha256": "abdc54ac5856fa6a14c937fa6e7335c94e4edd42cc0e67d2a6045a94f8f6e389",
+      "step": 7
+    },
+    {
+      "id": "aca1489f-8b63-4d5d-8c96-d6e4bb81555e",
+      "modelSha256": "a556804ee54d26adea467e638e0e7ad6695905a8b5f5c3c2d722cea70f04b477",
+      "step": 14
+    },
+    {
+      "id": "cf958484-9ae2-45c7-944d-7479348921aa",
+      "modelSha256": "8e95616a7ed6aedf6e58376299e92c7f8290014b7945527d5e3a9dfe06baead6",
+      "step": 21
+    }
+  ],
+  "date": "2026-11-20",
+  "evaluationRunId": "e3cf8d22-d433-4d70-aee6-1eb3b2bfe207",
+  "externalEvaluationSummary": "STEP_8_MARKDOWN_EVALUATION.json",
+  "generation": {
+    "comparisonCompletions": 36,
+    "humanReview": "pending",
+    "maxNewTokens": 32,
+    "method": "greedy",
+    "observedNewlineOnlyCompletions": 36,
+    "prompts": 12,
+    "reviewer": "Codex (assistant); provisional, no factual-accuracy rating"
+  },
+  "independentEvaluation": {
+    "available": true,
+    "datasetId": "e1c1a986-9907-4ba4-bd52-b781a51627aa",
+    "datasetVersionId": "2e1ad2ca-d81e-465f-b4fe-59fcd54c74ab",
+    "evaluationRunId": "0d38595c-f269-4b46-b7da-2ce44409e5e8",
+    "limitations": "Same airline/domain and shared terminology; lexical checks do not establish absence of paraphrases or expert approval.",
+    "representation": "UTF-8 Markdown kept as text; NFC/newline normalization and outer whitespace trim; no HTML stripping or whitespace collapsing",
+    "results": [
+      {
+        "available": true,
+        "blocks": 28,
+        "documents": 2,
+        "loss": 6.911798383689874,
+        "perplexity": 1004.0512890819522,
+        "perplexityOverflow": false,
+        "step": 7,
+        "targetTokens": 27075
+      },
+      {
+        "available": true,
+        "blocks": 28,
+        "documents": 2,
+        "loss": 6.849646070397571,
+        "perplexity": 943.546898388736,
+        "perplexityOverflow": false,
+        "step": 14,
+        "targetTokens": 27075
+      },
+      {
+        "available": true,
+        "blocks": 28,
+        "documents": 2,
+        "loss": 6.799942679893937,
+        "perplexity": 897.795828423385,
+        "perplexityOverflow": false,
+        "step": 21,
+        "targetTokens": 27075
+      }
+    ]
+  },
+  "integrity": {
+    "baselineRecordUnchanged": true,
+    "newTrainingRuns": 0,
+    "registeredDownloadsVerified": true,
+    "trainingSourceAndCheckpointsReverified": true,
+    "zipContentsVerified": true
+  },
+  "metrics": [
+    {
+      "available": true,
+      "blocks": 7,
+      "documents": 1,
+      "loss": 6.547282022436639,
+      "perplexity": 697.346224300652,
+      "perplexityOverflow": false,
+      "step": 7,
+      "targetTokens": 6654
+    },
+    {
+      "available": true,
+      "blocks": 7,
+      "documents": 1,
+      "loss": 6.331947395455418,
+      "perplexity": 562.2504523955241,
+      "perplexityOverflow": false,
+      "step": 14,
+      "targetTokens": 6654
+    },
+    {
+      "available": true,
+      "blocks": 7,
+      "documents": 1,
+      "loss": 6.109946215657955,
+      "perplexity": 450.3144946474765,
+      "perplexityOverflow": false,
+      "step": 21,
+      "targetTokens": 6654
+    }
+  ],
+  "modelConfigId": "43a0861c-7d0f-45e3-abe3-dcc8af429a52",
+  "nextAction": "Review/correct extraction issues and obtain human/domain review; use the frozen external corpus for one controlled next-pilot comparison, without assuming useful generation from lower loss.",
+  "playgroundRunId": "ecb8df39-19cd-4a02-98a5-fffff350e48e",
+  "projectId": "6c465258-3451-4421-a797-730b5d982760",
+  "promptSetVersionId": "608df22a-167d-46db-b676-e4c72c065881",
+  "runtime": {
+    "python": "3.14.4",
+    "safetensors": "0.8.0",
+    "tokenizers": "0.22.2",
+    "torch": "2.11.0+cpu",
+    "transformers": "4.57.6"
+  },
+  "schemaVersion": 1,
+  "source": {
+    "datasetId": "a2ce1a39-3aeb-41e5-95a6-08c11ef1d604",
+    "datasetName": "ppc ",
+    "datasetVersion": 3,
+    "datasetVersionId": "6a80ee86-5ef8-4c75-b359-b4e51b2d9fdc",
+    "sequenceRunId": "95556465-6286-411f-a4a4-c45a52a6e213",
+    "sourceIdentity": "06e2c926dcf5ac4eba6ed1f749b56c45c68b0a83cde52761e136ef62861ee69c",
+    "tokenizerRunId": "d6359610-da1a-46b2-b39a-f91f163a9572"
+  },
+  "sourceReview": {
+    "findings": [
+      "Rendered page 1 shows হলো/কোনো; extracted source and reviewed text contain হললো/ককোননো.",
+      "Table on page 14 is linearized into text; broader table/page review remains pending."
+    ],
+    "sampledPages": [
+      1,
+      14,
+      27
+    ],
+    "visuallyComparedPages": [
+      1,
+      14
+    ]
+  },
+  "status": "baseline and external Markdown evaluation executed; human/domain review pending",
+  "timezone": "Asia/Dhaka",
+  "verification": {
+    "backendTestsPassed": 93,
+    "backendTestsSkipped": 1,
+    "browser": {
+      "annotationPersistence": true,
+      "browserWorkflow": "passed",
+      "escapedTextVisible": true,
+      "evaluationCompletions": 36,
+      "manualReviewExport": true,
+      "mobileOverflow": false,
+      "pageErrors": 0,
+      "playgroundMatchesEvaluation": true,
+      "playgroundRunId": "ecb8df39-19cd-4a02-98a5-fffff350e48e",
+      "refresh": true,
+      "trainingSampleVisible": true,
+      "whitespaceOutputVisible": true
+    },
+    "externalMarkdownBrowser": {
+      "blocksPerCheckpoint": 28,
+      "browserWorkflow": "passed",
+      "externalDatasetSelectable": true,
+      "externalRows": 3,
+      "markdownPicker": true,
+      "mobileOverflow": false,
+      "pageErrors": 0,
+      "resultDownload": true,
+      "selectedMarkdownFiles": 2,
+      "targetsPerCheckpoint": 27075
+    },
+    "frontendTestsPassed": 36,
+    "markdownSupport": ".md/.markdown UTF-8; tables/code kept as text",
+    "productionBuild": "passed"
+  }
+}
