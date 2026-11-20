@@ -12,3 +12,5 @@ checkpoints/
 logs/
 .pytest_cache/
 *.pyc
+./doc
+/doc
