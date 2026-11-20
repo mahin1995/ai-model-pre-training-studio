@@ -23,3 +23,25 @@ The saved Step 8 report records token 202 repeated 32 times in all 36 completion
 **No new pilot yet.** The original PDF has known extraction discrepancies, human/domain and permission review has not been recorded, a final test corpus has not been identified, and a compute/disk budget and acceptance thresholds are not specified. A controlled hypothesis and comparable training setup should be selected after review and diagnosis. No corrected dataset has been published and no domain or permission approval is implied.
 
 Next: review the original PDF page by page against its extraction; confirm source rights and document lineage; inspect the saved generation pipeline and checkpoint probabilities; then specify one comparison, budget and stopping/acceptance criteria. Record reviewer decisions and retain immutable baseline artifacts. See [Step 9 plan](../STEP_9_DATA_QUALITY_PILOT_PLAN.md).
+
+## Follow-up — 27-page automated comparison and full decoding check
+
+All 27 rendered pages were inspected for layout and compared automatically, page by page, against an independently extracted text. A review draft proposes 14 targeted Bengali character corrections across pages 1, 2, 3, 4, 11, 22 and 26; all 27 IDs and other record metadata were verified unchanged. After Unicode/whitespace normalization, 26 corrected page texts match the alternative extraction; page 25 differs by one space. Extractor agreement does not validate table structure or replace line-by-line visual/domain review. The draft and correction list are under the ignored `data/assessments/step-9-2026-11-20/` folder; no new dataset version was published.
+
+Cached generation and direct uncached greedy decoding agree for **all 32 generated tokens** of each of 36 checkpoint/prompt combinations. The source extraction discrepancies are real; a general safe code fix for arbitrary PDF glyph extraction has not been established. See [diagnosis report](STEP_9_DIAGNOSIS_REPORT.md), [results](STEP_9_DIAGNOSIS.json) and [pilot card](STEP_9_EXPERIMENT_CARD.md). The API was unavailable during the check; no pilot was started.
+
+## Table follow-up
+
+Compared the visible tables on pages 3, 5, 6, 7, 9, 11, 12, 14 and 22 with their saved text. A separate draft makes page 7 row associations explicit and rejoins wrapped identifiers in page 9's table; a 27-record/metadata check passed. See [table review](STEP_9_TABLE_REVIEW.md). This is technical transcription work, not aviation approval or publication.
+
+## Duration pilot executed
+
+The approved bounded CPU diagnostic completed 70 updates in 18.2 seconds; step 21 reproduced the original checkpoint hash. The frozen external evaluation improved from 6.799943 to 6.754163 loss at step 70, but 11/12 prompt continuations remained whitespace-only. See [pilot result](STEP_9_PILOT_RESULT.md). Source transcription review and domain/permission decisions are still pending; this does not make Step 9 fully complete.
+
+## Source and domain cross-check
+
+A 27-page technical review ledger and a limited comparison against the CAAB-hosted 2024 ANO 1 Annexure 8 are recorded in [domain and permission review](STEP_9_DOMAIN_PERMISSION_REVIEW.md). Notable issues are the broader shorthand for the 90-day flight-controls rule, ambiguous Boolean logic and omitted aircraft-training alternatives in portions of the summary. Current applicability, expert approval and rights for the user-supplied PDF and OM-A documents remain unverified; no corrected version was published or declared domain-approved.
+
+## Controlled decoding probe
+
+Compared the original greedy output with repeated-bigram blocking and three seeded top-k samples for both saved step 21/70 models and the same 12 prompts. Although the alternative settings avoid all-whitespace outputs, inspected text remains fragmented and repetitive; this is not a demonstrated fix. Results and reproducible process graph are in [decoding probe](STEP_9_DECODING_PROBE.md). The probe ran twice with identical output hash and unchanged checkpoints.

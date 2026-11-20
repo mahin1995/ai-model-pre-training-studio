@@ -1,0 +1,82 @@
+{
+  "runId": "78be46dd-652c-45db-8ea0-4b4734a7ebdf",
+  "configurationId": "eaec134b-c637-4460-ad49-557c77837714",
+  "evaluationId": "2a9c7145-829e-4145-adcd-f175cb552a83",
+  "runtimeSeconds": 18.151183,
+  "sourceIdentity": "06e2c926dcf5ac4eba6ed1f749b56c68b0a83cde52761e136ef62861ee69c",
+  "baselineStep21Sha256": "8e95616a7ed6aedf6e58376299e92c7f8290014b7945527d5e3a9dfe06baead6",
+  "candidateStep21Sha256": "8e95616a7ed6aedf6e58376299e92c7f8290014b7945527d5e3a9dfe06baead6",
+  "candidateStep70Sha256": "262537e93674b54148e5a7694ab8bf12911bb7d161ef52c6346256fba86d94f9",
+  "results": [
+    {
+      "step": 21,
+      "external": {
+        "available": true,
+        "blocks": 28,
+        "documents": 2,
+        "loss": 6.799942679893937,
+        "perplexity": 897.795828423385,
+        "perplexityOverflow": false,
+        "targetTokens": 27075
+      },
+      "train": {
+        "available": true,
+        "blocks": 7,
+        "documents": 1,
+        "loss": 6.109946215657955,
+        "perplexity": 450.3144946474765,
+        "perplexityOverflow": false,
+        "targetTokens": 6654
+      },
+      "whitespaceOnly": 12,
+      "promptCount": 12
+    },
+    {
+      "step": 70,
+      "external": {
+        "available": true,
+        "blocks": 28,
+        "documents": 2,
+        "loss": 6.754162965318392,
+        "perplexity": 857.6215903533581,
+        "perplexityOverflow": false,
+        "targetTokens": 27075
+      },
+      "train": {
+        "available": true,
+        "blocks": 7,
+        "documents": 1,
+        "loss": 4.890067895540146,
+        "perplexity": 132.96260131245927,
+        "perplexityOverflow": false,
+        "targetTokens": 6654
+      },
+      "whitespaceOnly": 11,
+      "promptCount": 12
+    }
+  ],
+  "evaluationReportSha256": "badc64e666b239d203f4d8f154b65ee974f16eddad9d7fba69789d48bc9698fc",
+  "evaluationBundleSha256": "d754647ffb21388e39b66ccaff22f77b8e43eb46e5d172b5dbbe9abaa438b36c",
+  "totalRunBytes": 92975028,
+  "trainingCoverage": {
+    "order": [
+      2,
+      0,
+      3,
+      6,
+      5,
+      4,
+      1
+    ],
+    "protocol": "all-train-epochs-v1",
+    "nextOffset": 0,
+    "epochOffset": 0,
+    "recordsSha256": "f7ffcf998d521bd74a56cdd8e34117fe6ebd240800043e98f16c91f067630309",
+    "blockExposures": 70,
+    "trainingBlocks": 7,
+    "completedEpochs": 10,
+    "targetExposures": 66540,
+    "uniqueBlocksVisited": 7,
+    "targetTokensPerEpoch": 6654
+  }
+}

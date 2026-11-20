@@ -11,3 +11,11 @@ Status: **Prepared, not run.** This is a diagnostic proposal, not a claim of mod
 - **Decision:** compare step 21 reproducibility and predeclared limits, then record whether loss and prompt outputs change; do not infer quality, accuracy or broad generalization. Exact acceptance thresholds and budget remain unspecified, so execution is pending.
 
 The app's sequence route binds a sequence to its tokenizer run's original source snapshot; it cannot presently generate corrected-version sequences using that existing tokenizer through the exposed flow. A corrected-data-only experiment needs a separate provenance-safe design and verification; do not bypass the snapshot checks.
+
+## Execution protocol recorded before the run
+
+On the user's request to proceed, use the previously proposed CPU ceiling of 900 seconds and 1 GB additional storage; the executor enforces its time limit and rejects a checkpoint estimate over 1 GiB. This is a duration diagnostic on the unchanged source, not a corrected-data experiment. Pre-run decision rules: step-21 model hash matching the original is a repeatability pass; otherwise investigate and do not claim an isolated duration comparison. For the exploratory endpoint, compare step 70 with step 21 using the same fixed evaluation corpus and prompts; a lower loss is improvement on this corpus only, and 0 of 12 whitespace-only continuations is a proposed readability screen, not domain acceptance. Record exact numbers regardless of outcome. Source extraction defects and domain review remain open.
+
+## Actual result
+
+Completed; see [pilot result](STEP_9_PILOT_RESULT.md) and [summary](STEP_9_PILOT_SUMMARY.json). Step 21 matched the original model hash. Step 70 reduced external loss on the small frozen corpus but 11/12 continuations remained whitespace-only, failing the proposed screen. This was an unchanged-data duration experiment; source review and domain/permission decisions remain pending.
