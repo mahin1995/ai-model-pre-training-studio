@@ -24,7 +24,7 @@ def main(kind, directory):
             result = train_tokenizer(documents, directory, settings["vocabSize"], notify)
         elif kind == "sequence":
             result = generate_sequences(documents, load_tokenizer(directory / "source-tokenizer.json"), directory,
-                                        settings["sequenceLength"], notify)
+                                        settings["sequenceLength"], notify, settings.get("objective", "causal"))
         else:
             raise DatasetError("Unknown preparation task.")
         write_json(directory / "result.json", result)

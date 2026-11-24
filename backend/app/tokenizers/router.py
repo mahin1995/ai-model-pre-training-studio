@@ -106,7 +106,7 @@ def create_sequences(project_id: UUID, body: SequenceCreate, request: Request):
             raise HTTPException(409, "Confirm the tokenizer source usage permission before generating sequences.")
         snapshot["tokenizer"] = {key: tokenizer[key] for key in ("status", "storage_key", "manifest")}
         return enqueue(conn, root, project_id, "sequence", snapshot,
-                       {"sequenceLength": body.sequenceLength}, body.tokenizerRunId)
+                       {"sequenceLength": body.sequenceLength, **({"objective": "sft"} if body.objective == "sft" else {})}, body.tokenizerRunId)
 
 
 @tokenizer_router.post("/{run_id}/encode")

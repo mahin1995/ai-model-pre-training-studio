@@ -45,12 +45,14 @@ class PromptSetCreate(Model):
 
 class GenerationCreate(Model):
     checkpointId: UUID
+    excerpt: Annotated[StrictStr, Field(max_length=4096)] | None = None
     prompt: Annotated[StrictStr, Field(max_length=4096)]
     maxNewTokens: StrictInt = 32
 
     @model_validator(mode='after')
     def settings_valid(self):
         valid_text(self.prompt)
+        if self.excerpt is not None: valid_text(self.excerpt)
         if self.maxNewTokens not in (8,16,32,64,128):raise ValueError('Choose 8/16/32/64/128 new tokens.')
         return self
 
@@ -59,24 +61,28 @@ class EvaluationCreate(Model):
     checkpointIds: Annotated[list[UUID], Field(min_length=1,max_length=4)]
     promptSetVersionId: UUID
     maxNewTokens: StrictInt = 32
-    metricScope: Literal['training','validation','test','external'] = 'training'
+    metricScope: Literal['training','validation','test','external','final-test'] = 'training'
     externalDatasetVersionId: UUID | None = None
 
     @model_validator(mode='after')
     def settings_valid(self):
         if len(set(self.checkpointIds)) != len(self.checkpointIds):raise ValueError('Select distinct checkpoints.')
         if self.maxNewTokens not in (8,16,32,64,128):raise ValueError('Choose 8/16/32/64/128 new tokens.')
-        if (self.metricScope=='external') != (self.externalDatasetVersionId is not None):
-            raise ValueError('An external dataset version is required only for external evaluation.')
+        if (self.metricScope in {'external', 'final-test'}) != (self.externalDatasetVersionId is not None):
+            raise ValueError('An external dataset version is required for independent evaluation or a final test.')
         return self
 
 
 class PromptPreview(Model):
     checkpointId: UUID
+    excerpt: Annotated[StrictStr, Field(max_length=4096)] | None = None
     prompt: Annotated[StrictStr, Field(max_length=4096)]
 
     @model_validator(mode='after')
-    def text_valid(self):valid_text(self.prompt); return self
+    def text_valid(self):
+        valid_text(self.prompt)
+        if self.excerpt is not None: valid_text(self.excerpt)
+        return self
 
 
 class AnnotationEdit(Model):

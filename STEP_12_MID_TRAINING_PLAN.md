@@ -4,7 +4,7 @@ This is the conditional bridge from M10 to M11 in the [use-case plan](MID_TRAINI
 
 ## Implementation status
 
-Sequence generation can now select a reviewed corpus version while reusing a saved tokenizer. The manifest records the corpus version and tokenizer fit source separately. Model source snapshots retain both sources for permission and held-out overlap checks. The mid-training executor and its stage-specific checkpoint lineage still need implementation.
+Sequence generation can now select a reviewed corpus version while reusing a saved tokenizer. The manifest records the corpus version and tokenizer fit source separately. Model source snapshots retain both sources for permission and held-out overlap checks. A whole-dataset run can now initialize from a compatible project checkpoint, begin at step zero with a fresh optimizer, and retain parent and source lineage. Resume remains available within the stage. A real domain run depends on the baseline decision.
 
 ## Work
 

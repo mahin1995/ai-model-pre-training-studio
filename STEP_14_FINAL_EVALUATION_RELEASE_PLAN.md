@@ -4,7 +4,7 @@ Completes M11 after [Step 13](STEP_13_SUPERVISED_FINE_TUNING_PLAN.md) produces a
 
 ## Implementation status
 
-Evaluation can select the reserved test split from a checkpoint's published sequence artifact. The backend verifies the split against the frozen tokenizer and reviewed source before scoring. The final acceptance protocol, SFT candidate evaluation and release package still need implementation and execution.
+Evaluation can select a checkpoint's reserved split or compare compatible checkpoints across runs against an independent reviewed Q&A test split. Playground shows generated text as the worker produces it. Release packaging verifies the selected model against the final-test report and includes the reviewed model card. A CPU fixture has exercised comparison, packaging and restore. A domain reviewer still owns the final quality decision.
 
 ## Work
 

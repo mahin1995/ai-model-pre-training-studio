@@ -13,6 +13,7 @@ from ..models.router import find_config
 from ..models.schemas import ResumeCreate, RunCreate
 from ..models.source import current_permission, inspect_source
 from .jobs import ACTIVE
+from .pilot import FULL_STEP_LIMIT
 from .runtime import inspect_runtime, select_runtime
 from .storage import check_resources, checked_file, verify_checkpoint
 
@@ -23,6 +24,7 @@ def run_json(row, checkpoints=()):
     start, finish = row['started_at'], row['finished_at']
     return {'id':str(row['id']),'projectId':str(row['project_id']),'modelConfigId':str(row['model_config_id']),
         'parentRunId':str(row['parent_run_id']) if row['parent_run_id'] else None,
+        'initialCheckpointId':str(row['initial_checkpoint_id']) if row['initial_checkpoint_id'] else None,
         'trainingKind':row['training_kind'], 'status':row['status'],'verdict':row['verdict'],'configuration':row['configuration'],'metrics':row['metrics'],
         'manifest':row['manifest'],'runtime':row['runtime_snapshot'],'error':row['error'],'cancelRequested':row['cancel_requested'],
         'createdAt':row['created_at'].isoformat(),'elapsedSeconds':((finish or datetime.now(timezone.utc))-start).total_seconds() if start else 0,
@@ -51,12 +53,48 @@ def serialize_run(conn, row):
     return run_json(row, conn.execute('SELECT * FROM smoke_checkpoints WHERE run_id=%s ORDER BY step',(row['id'],)).fetchall())
 
 
-def enqueue(conn, root, project_id, config, parent=None, checkpoint=None):
+def initial_checkpoint(conn, project_id, checkpoint_id):
+    checkpoint = conn.execute("""SELECT c.* FROM smoke_checkpoints c JOIN smoke_runs r ON r.id=c.run_id
+        WHERE c.id=%s AND r.project_id=%s""", (checkpoint_id, project_id)).fetchone()
+    if not checkpoint:
+        raise HTTPException(404, 'Initialization checkpoint not found in this project.')
+    parent = find_smoke(conn, project_id, checkpoint['run_id'], lock=True)
+    if parent['status'] != 'completed':
+        raise HTTPException(409, 'Choose a checkpoint from a completed run.')
+    return parent, checkpoint
+
+
+def enqueue(conn, root, project_id, config, parent=None, checkpoint=None, initialize=None):
+    configuration = config['configuration']
+    snapshot = config['source_snapshot']
+    if checkpoint:
+        configuration = parent['configuration']
+        snapshot = parent['source_snapshot']
     try:
         check_resources(root)
+        if configuration.get('objective') == 'sft' and not (initialize or checkpoint):
+            raise DatasetError('SFT requires a compatible parent checkpoint.')
         current_permission(conn, config['source_snapshot'])
         inspect_source(root, config['source_snapshot'], config['configuration'])
-        runtime = select_runtime(config['configuration'])
+        if initialize:
+            current_permission(conn, parent['source_snapshot'])
+            verify_checkpoint(root, initialize)
+            old = parent['configuration']
+            if any(old[key] != configuration[key] for key in ('architecture', 'vocabSize', 'contextLength', 'layers', 'hiddenSize', 'heads')):
+                raise DatasetError('Initialization checkpoint architecture or context does not match the saved configuration.')
+            parent_source = parent['source_snapshot']
+            artifact = lambda source: source['tokenizer']['manifest']['artifacts']['tokenizer']['sha256']
+            if artifact(snapshot) != artifact(parent_source):
+                raise DatasetError('Initialization requires the exact same tokenizer as the parent checkpoint.')
+            lineage = {source['manifestSha256']: source for source in [
+                *parent_source.get('ancestorDatasets', ()), parent_source['dataset'],
+                *([parent_source['tokenizerFitSource']] if parent_source.get('tokenizerFitSource') else []),
+            ]}
+            snapshot = {**snapshot, 'ancestorDatasets': list(lineage.values())}
+            configuration = {**configuration, 'initialization': 'checkpoint',
+                             'initialCheckpointId': str(initialize['id'])}
+        current_permission(conn, snapshot)
+        runtime = select_runtime(configuration)
         if checkpoint:
             verify_checkpoint(root, checkpoint)
             info = checkpoint['manifest']['checkpoint']
@@ -66,9 +104,10 @@ def enqueue(conn, root, project_id, config, parent=None, checkpoint=None):
         raise HTTPException(409,str(exc) if isinstance(exc,DatasetError) else 'Training storage is unavailable.') from None
     run_id = uuid4()
     row = conn.execute('''INSERT INTO smoke_runs(id,project_id,model_config_id,parent_run_id,resume_checkpoint_id,
-        storage_key,configuration,source_snapshot,runtime_snapshot,training_kind) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *''',
+        storage_key,configuration,source_snapshot,runtime_snapshot,training_kind,initial_checkpoint_id)
+        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *''',
         (run_id,project_id,config['id'],parent['id'] if parent else None,checkpoint['id'] if checkpoint else None,
-         f'training/{project_id}/{run_id}/results',Jsonb(config['configuration']),Jsonb(config['source_snapshot']),Jsonb(runtime),config['training_kind'])).fetchone()
+         f'training/{project_id}/{run_id}/results',Jsonb(configuration),Jsonb(snapshot),Jsonb(runtime),config['training_kind'],initialize['id'] if initialize else None)).fetchone()
     return run_json(row)
 
 
@@ -94,6 +133,11 @@ def create_run(project_id: UUID, body: RunCreate, request: Request):
         config = find_config(conn,project_id,body.modelConfigId,lock=True)
         if config['training_kind'] != request_kind(request):
             raise HTTPException(409, 'Choose a configuration for this training mode.')
+        if body.initialCheckpointId:
+            if config['training_kind'] != 'pilot':
+                raise HTTPException(422, 'Checkpoint initialization is available for whole-dataset pilots.')
+            parent, checkpoint = initial_checkpoint(conn, project_id, body.initialCheckpointId)
+            return enqueue(conn, request.app.state.data_root, project_id, config, parent=parent, initialize=checkpoint)
         return enqueue(conn,request.app.state.data_root,project_id,config)
 
 
@@ -126,6 +170,9 @@ def retry_run(project_id: UUID, run_id: UUID, request: Request):
         if previous['status'] in ACTIVE:
             raise HTTPException(409,'Finish or cancel this run before retrying.')
         config = find_config(conn,project_id,previous['model_config_id'],lock=True)
+        if origin := previous['configuration'].get('initialCheckpointId'):
+            parent, checkpoint = initial_checkpoint(conn, project_id, origin)
+            return enqueue(conn, request.app.state.data_root, project_id, config, parent=parent, initialize=checkpoint)
         return enqueue(conn,request.app.state.data_root,project_id,config)
 
 
@@ -145,7 +192,7 @@ def resume_run(project_id: UUID, run_id: UUID, body: ResumeCreate, request: Requ
 
 @router.get('/pilot-runs/{run_id}/metrics')
 @router.get('/smoke-runs/{run_id}/metrics')
-def metrics(project_id: UUID, run_id: UUID, request: Request, afterStep: int=Query(-1,ge=-1,le=2000)):
+def metrics(project_id: UUID, run_id: UUID, request: Request, afterStep: int=Query(-1,ge=-1,le=FULL_STEP_LIMIT)):
     with request.app.state.pool.connection() as conn:
         run = find_requested(conn,project_id,run_id,request)
     final = storage_path(request.app.state.data_root,run['storage_key'])
@@ -211,8 +258,10 @@ def delete_run(project_id: UUID, run_id: UUID, request: Request):
         if run['status'] in ACTIVE:
             raise HTTPException(409,'Cancel or finish this run before deletion.')
         if conn.execute('SELECT 1 FROM smoke_runs WHERE parent_run_id=%s',(run_id,)).fetchone():
-            raise HTTPException(409,'Delete dependent resumed runs before deleting this run and its checkpoints.')
-        if conn.execute('SELECT 1 FROM inference_runs WHERE training_run_id=%s',(run_id,)).fetchone():
+            raise HTTPException(409,'Delete dependent training runs before deleting this run and its checkpoints.')
+        if conn.execute('''SELECT 1 FROM inference_runs WHERE training_run_id=%s
+            UNION ALL SELECT 1 FROM inference_checkpoint_refs i JOIN smoke_checkpoints c ON c.id=i.checkpoint_id
+            WHERE c.run_id=%s''', (run_id, run_id)).fetchone():
             raise HTTPException(409,'Delete dependent generation/evaluation runs before deleting this training run and its checkpoints.')
         conn.execute('DELETE FROM smoke_checkpoints WHERE run_id=%s',(run_id,))
         conn.execute('DELETE FROM smoke_runs WHERE id=%s',(run_id,))
@@ -246,9 +295,9 @@ def pilot_preview(project_id: UUID, body: RunCreate, request: Request):
                 'tokenizerRunId': config['source_snapshot']['tokenizerRunId'],
                 'sequenceRunId': config['source_snapshot']['sequenceRunId'],
                 'trainingBlocks': len(records), 'trainingDocuments': len({r['documentId'] for r in records}),
-                'targetTokensPerEpoch': sum(sum(r['attention_mask']) - 1 for r in records),
+                'targetTokensPerEpoch': sum(label != -100 for record in records for label in record['labels'][1:]),
                 'epochs': settings['epochs'], 'totalSteps': settings['maxSteps'],
                 'checkpointSteps': settings['checkpointSteps'], 'estimatedStorageBytes': settings['estimatedStorageBytes'],
-                'timeLimitSeconds': settings['timeLimitSeconds'], 'device': 'cpu',
+                'timeLimitSeconds': settings['timeLimitSeconds'], 'device': settings['device'],
                 'warnings': ['Training diagnostic only. Independent evaluation is separate.',
                              'Each block first token has no supervised causal target; padding is excluded.']}

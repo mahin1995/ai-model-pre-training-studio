@@ -5,6 +5,14 @@ import math
 import random
 
 PROTOCOL = 'all-train-epochs-v1'
+PILOT_BLOCK_LIMIT = 256
+PILOT_STEP_LIMIT = 2_000
+FULL_BLOCK_LIMIT = 2_048
+FULL_STEP_LIMIT = 10_000
+
+
+def run_limits(profile):
+    return (FULL_BLOCK_LIMIT, FULL_STEP_LIMIT) if profile == 'full' else (PILOT_BLOCK_LIMIT, PILOT_STEP_LIMIT)
 
 
 def record_identity(records):
@@ -22,14 +30,16 @@ def checkpoint_steps(count, epochs):
     return [math.ceil(k * epochs / slots) * count for k in range(1, slots + 1)]
 
 
-def coverage(step, records, seed, records_sha=None):
+def coverage(step, records, seed, records_sha=None, *, targets=None):
     count = len(records)
     completed, offset = divmod(step, count)
     order = epoch_order(count, seed, completed)
-    targets = [sum(r['attention_mask']) - 1 for r in records]
+    if targets is None:
+        targets = [sum(label != -100 for label in record['labels'][1:]) for record in records]
+    epoch_targets = sum(targets)
     return {'protocol': PROTOCOL, 'completedEpochs': completed, 'epochOffset': offset,
             'trainingBlocks': count, 'uniqueBlocksVisited': count if completed else offset,
-            'targetTokensPerEpoch': sum(targets),
-            'targetExposures': completed * sum(targets) + sum(targets[i] for i in order[:offset]),
+            'targetTokensPerEpoch': epoch_targets,
+            'targetExposures': completed * epoch_targets + sum(targets[i] for i in order[:offset]),
             'blockExposures': step, 'order': order, 'nextOffset': offset,
             'recordsSha256': records_sha or record_identity(records)}

@@ -8,15 +8,20 @@ from pydantic import Field, StrictInt, StrictStr
 from ..datasets.storage import DatasetError
 from ..schemas import Model
 from .schemas import SPECIAL_TOKENS
+from .sft_template import TEMPLATE_VERSION, format_prompt
 
-TEMPLATE_VERSION = "source-qa-v1"
 Text = Annotated[StrictStr, Field(min_length=1, max_length=16_384)]
 
 
-class SftPreview(Model):
+class SftExample(Model):
     question: Text
     excerpt: Text
     answer: Text
+    sourceRevision: Annotated[StrictStr, Field(max_length=512)] | None = None
+    clauses: Annotated[list[Annotated[StrictStr, Field(min_length=1, max_length=128)]], Field(max_length=32)] = Field(default_factory=list)
+
+
+class SftPreview(SftExample):
     contextLength: Annotated[StrictInt, Field(ge=8, le=1024)]
 
 
@@ -24,10 +29,7 @@ def format_example(tokenizer, example: SftPreview):
     if not all(text.strip() for text in (example.question, example.excerpt, example.answer)):
         raise DatasetError("Question, source excerpt and answer must contain text.")
 
-    # Quote data so an embedded newline cannot introduce another template field.
-    question = json.dumps(example.question, ensure_ascii=False)
-    excerpt = json.dumps(example.excerpt, ensure_ascii=False)
-    prompt = f"Source: {excerpt}\nQuestion: {question}\nAnswer:\n"
+    prompt = format_prompt(example.question, example.excerpt)
     try:
         prompt.encode("utf-8")
         example.answer.encode("utf-8")
@@ -54,3 +56,16 @@ def format_example(tokenizer, example: SftPreview):
         "promptTokens": len(prefix),
         "supervisedTokens": len(targets),
     }
+
+
+def parse_document(document, length):
+    try:
+        return SftPreview.model_validate({**json.loads(document["text"]), "contextLength": length})
+    except (TypeError, ValueError):
+        raise DatasetError("Each reviewed SFT document must be one JSON object with question, excerpt and answer.") from None
+
+
+def document_sequence(tokenizer, document, length):
+    formatted = format_example(tokenizer, parse_document(document, length))
+    return {"input_ids": formatted["inputIds"], "attention_mask": formatted["attentionMask"],
+            "labels": formatted["labels"]}

@@ -4,8 +4,8 @@ import math
 from ..training.data import validate_record
 
 
-def validate_block(record, vocab, length):
-    return validate_record({**record,'split':'train'},vocab,length)
+def validate_block(record, vocab, length, assistant_only=False):
+    return validate_record({**record,'split':'train'},vocab,length,assistant_only)
 
 
 def summarize_loss(weighted_loss, targets, blocks, documents):

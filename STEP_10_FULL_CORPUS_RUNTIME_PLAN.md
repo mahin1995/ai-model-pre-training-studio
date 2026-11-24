@@ -2,6 +2,10 @@
 
 Covers remaining M8 and M9 work. Continue from the [Step 9 quality pilot](STEP_9_DATA_QUALITY_PILOT_PLAN.md). Build and verify with fixtures while awaiting the real inputs.
 
+## Implementation status
+
+The Studio verifies reviewed document provenance, split membership, tokenizer and sequence checksums. The full training profile accepts explicit CPU or CUDA, up to 2,048 blocks and 10,000 updates within the existing artifact budget. Use the target machine to measure throughput, dataset capacity and GPU memory before selecting the real run.
+
 ## Inputs
 
 - Scope for the first release: Bangla and mixed-language aviation document study with source-backed answers.

@@ -27,11 +27,11 @@ export function useRuns(project: string, kind: InferenceKind) {
     const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>;
     async function poll() {
       try { await refresh(controller.signal); } catch (e) { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "Polling failed; retrying."); }
-      if (!controller.signal.aborted) timer = setTimeout(() => void poll(), 1500);
+      if (!controller.signal.aborted) timer = setTimeout(() => void poll(), (kind === "generation" ? 500 : 1500));
     }
-    timer = setTimeout(() => void poll(), 1500);
+    timer = setTimeout(() => void poll(), (kind === "generation" ? 500 : 1500));
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [active, refresh]);
+  }, [active, kind, refresh]);
   async function action(command: "cancel" | "retry" | "delete", run: InferenceRun) {
     if (command === "delete" && !window.confirm("Delete this inference run and its results? Original models and datasets remain saved.")) return;
     setBusy(true); setError(""); setNotice("");

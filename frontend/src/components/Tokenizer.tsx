@@ -63,10 +63,10 @@ function TokenizerWorkspace({ projectId, onDatasets }: { projectId: string; onDa
     } catch (e) { setError(e instanceof Error ? e.message : "Run action failed."); }
     finally { setBusy(false); }
   }
-  async function generate(length: number, datasetVersionId?: string) {
+  async function generate(length: number, datasetVersionId?: string, objective?: "sft") {
     if (!selected) return null;
     setBusy(true); setError(""); setNotice("");
-    try { const run = await startSequences(projectId, selected.id, length, datasetVersionId); setSequences((current) => [run, ...current]); setNotice("Sequence run created. Track its status below."); return run; }
+    try { const run = await startSequences(projectId, selected.id, length, datasetVersionId, objective); setSequences((current) => [run, ...current]); setNotice("Sequence run created. Track its status below."); return run; }
     catch (e) { setError(e instanceof Error ? e.message : "Could not generate sequences."); return null; }
     finally { setBusy(false); }
   }

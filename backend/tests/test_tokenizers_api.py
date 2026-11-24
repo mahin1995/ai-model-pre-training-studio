@@ -279,3 +279,32 @@ def test_reserved_test_inputs_match_published_test_split(studio, test_database):
     assert result["heldOutAvailable"]
     assert len(result["records"]) == snapshot["sequence"]["manifest"]["counts"]["test"]["sequences"]
     assert {record["split"] for record in result["records"]} == {"test"}
+
+
+def test_reviewed_qa_sequences_are_verified_and_require_a_parent(studio, test_database):
+    base, path, _, original = source(studio, test_database)
+    tokenizer = train(studio, test_database, base, original)
+    examples = {i: json.dumps({"question": f"What is rule {i}?", "excerpt": f"Rule {i} applies.", "answer": f"Rule {i}."})
+                for i in range(1, 4)}
+    correction, revision = save_all(studio, path, original, examples)
+    assert studio.post(correction + "/publish", json={"revision": revision}).status_code == 202
+    run_job(studio, test_database)
+    revised = studio.get(path).json()["versions"][0]
+    response = studio.post(base + "/sequence-runs", json={"tokenizerRunId": tokenizer["id"],
+        "datasetVersionId": revised["id"], "sequenceLength": 128, "objective": "sft"})
+    assert response.status_code == 202, response.text
+    run_id = response.json()["id"]
+    execute(studio, test_database)
+    sequence = studio.get(f"{base}/sequence-runs/{run_id}").json()
+    assert sequence["status"] == "completed", sequence["error"]
+    assert sequence["manifest"]["templateVersion"] == "source-qa-v1"
+    record = studio.get(f"{base}/sequence-runs/{run_id}/preview").json()["records"][0]
+    assert record["labels"][0] == -100
+    assert [label for label in record["labels"] if label != -100][-1] == 3
+    model = studio.post(base + "/model-configs", json={"trainingKind": "pilot", "sequenceRunId": run_id,
+        "settings": {"hiddenSize": 64, "epochs": 1}})
+    assert model.status_code == 201, model.text
+    assert model.json()["configuration"]["objective"] == "sft"
+    run = studio.post(base + "/pilot-runs", json={"modelConfigId": model.json()["id"]})
+    assert run.status_code == 409
+    assert "parent checkpoint" in run.json()["detail"]

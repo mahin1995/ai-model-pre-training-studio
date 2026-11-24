@@ -41,12 +41,18 @@ def create_config(project_id: UUID, body: ConfigCreate | PilotConfigCreate, requ
         snapshot = take_snapshot(conn, request.app.state.data_root, project_id, body.sequenceRunId)
         try:
             source = inspect_source(request.app.state.data_root, snapshot)
+            if source['objective'] == 'sft' and body.trainingKind != 'pilot':
+                raise ValueError('Use a whole-dataset pilot configuration for SFT sequences.')
             if body.trainingKind == 'pilot':
-                if source['trainingSequences'] > 256:
-                    raise ValueError('Pilot supports at most 256 train blocks; no blocks were sampled.')
+                from ..training.pilot import run_limits
+                limit, _ = run_limits(body.settings.profile)
+                if source['trainingSequences'] > limit:
+                    raise ValueError(f'This profile supports at most {limit:,} train blocks; no blocks were sampled.')
                 config = pilot_configuration(body.settings.model_dump(), source['vocabSize'], source['contextLength'], source['trainingRecords'])
             else:
                 config = configuration(body.settings.model_dump(), source['vocabSize'], source['contextLength'])
+            if source['objective'] == 'sft':
+                config.update(objective='sft', templateVersion=snapshot['sequence']['manifest']['templateVersion'])
             inspect_source(request.app.state.data_root, snapshot, config)
         except (ValueError, OSError) as exc:
             raise HTTPException(409, str(exc) if isinstance(exc,ValueError) else 'Saved source files are unavailable.') from None

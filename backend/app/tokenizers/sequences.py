@@ -6,6 +6,7 @@ from contextlib import ExitStack
 from ..datasets.storage import DatasetError
 from .schemas import MAX_CONTENT_TOKENS, MAX_OUTPUT_BYTES
 from .storage import describe_artifact
+from .sft import TEMPLATE_VERSION, format_example, parse_document
 
 
 def build_blocks(ids, length):
@@ -22,11 +23,12 @@ def build_blocks(ids, length):
                "labels": block + [-100] * padding}
 
 
-def generate_sequences(documents, tokenizer, output, length, notify=lambda stage: None):
+def generate_sequences(documents, tokenizer, output, length, notify=lambda stage: None, objective="causal"):
     notify("encoding")
     counts = {name: {"documents": 0, "sequences": 0, "contentTokens": 0, "boundaryTokens": 0, "paddedTokens": 0}
               for name in ("train", "validation", "test")}
     total_tokens = written_bytes = 0
+    excerpt_splits = {}
     with ExitStack() as stack:
         streams = {name: stack.enter_context((output / f"{name}.jsonl").open("w", encoding="utf-8")) for name in counts}
         tokens_stream = stack.enter_context((output / "documents.tokens.jsonl").open("w", encoding="utf-8"))
@@ -41,23 +43,36 @@ def generate_sequences(documents, tokenizer, output, length, notify=lambda stage
 
         for document in documents:
             notify("encoding")
-            encoded = tokenizer.encode(document["text"], add_special_tokens=False)
-            total_tokens += len(encoded.ids)
+            if objective == "sft":
+                example = parse_document(document, length)
+                excerpt = " ".join(example.excerpt.split())
+                if excerpt_splits.setdefault(excerpt, document["split"]) != document["split"]:
+                    raise DatasetError("A source excerpt crosses SFT split boundaries. Group related examples together.")
+                formatted = format_example(tokenizer, example)
+                block = {"input_ids": formatted["inputIds"], "attention_mask": formatted["attentionMask"],
+                         "labels": formatted["labels"]}
+                ids = block["input_ids"][:sum(block["attention_mask"])]
+                blocks = [block]
+            else:
+                encoded = tokenizer.encode(document["text"], add_special_tokens=False)
+                if tokenizer.decode(encoded.ids, skip_special_tokens=False) != document["text"]:
+                    raise DatasetError("Document tokenization did not preserve the reviewed text.")
+                ids = [2] + encoded.ids + [3]
+                blocks = build_blocks(ids, length)
+            content_tokens = len(ids) - 2
+            total_tokens += content_tokens
             if total_tokens > MAX_CONTENT_TOKENS:
                 raise DatasetError("Encoding exceeds the 2,000,000 content-token sample limit. Use a smaller reviewed corpus.")
-            if tokenizer.decode(encoded.ids, skip_special_tokens=False) != document["text"]:
-                raise DatasetError("Document tokenization did not preserve the reviewed text.")
-            ids = [2] + encoded.ids + [3]
             split = document["split"]
             stats = counts[split]
             stats["documents"] += 1
-            stats["contentTokens"] += len(encoded.ids)
+            stats["contentTokens"] += content_tokens
             stats["boundaryTokens"] += 2
             source = {key: document[key] for key in ("documentId", "recordIds", "pages", "filename", "split")}
             write(tokens_stream, {**source, "token_ids": ids})
             notify("packing")
             cursor = 0
-            for ordinal, block in enumerate(build_blocks(ids, length), start=1):
+            for ordinal, block in enumerate(blocks, start=1):
                 real = sum(block["attention_mask"])
                 if block["input_ids"][:real] != ids[cursor:cursor + real]:
                     raise DatasetError("Sequence reconstruction failed.")
@@ -70,8 +85,10 @@ def generate_sequences(documents, tokenizer, output, length, notify=lambda stage
     for stats in counts.values():
         slots = stats["sequences"] * length
         stats["paddingRatio"] = stats["paddedTokens"] / slots if slots else 0
-    return {"sequenceLength": length, "labelsPolicy": "unshifted; causal model/loss shifts once; padding=-100",
-            "packing": "non-overlapping; source-document isolated; singleton tail repaired",
+    return {"sequenceLength": length,
+            **({"objective": "sft", "templateVersion": TEMPLATE_VERSION} if objective == "sft" else {}),
+            "labelsPolicy": "unshifted; prompt and padding=-100" if objective == "sft" else "unshifted; causal model/loss shifts once; padding=-100",
+            "packing": "one example per block" if objective == "sft" else "non-overlapping; source-document isolated; singleton tail repaired",
             "counts": counts, "contentTokens": total_tokens,
             "warnings": [f"{name} split is empty; no evaluation sequences were created." for name in ("validation", "test") if not counts[name]["documents"]],
             "artifacts": {**{name: describe_artifact(output / f"{name}.jsonl") for name in counts},

@@ -4,7 +4,7 @@
 
 Finish the code for Steps 10–14, add focused tests with each change, then run the complete regression and release checks on the same commit. The software acceptance run uses small synthetic or permission-cleared fixtures, PostgreSQL and a pinned CPU training runtime. A separate target-machine run measures GPU capacity and a domain reviewer evaluates the real aviation model.
 
-The most recent recorded regression on this branch had 83 backend tests pass, 15 training-runtime tests skip, 36 frontend tests pass and a successful frontend production build. The CPU release run must exercise the training and inference tests that were skipped.
+Cloud code verification recorded 99 backend passes with one CUDA skip, 15 CPU numerical passes, 36 frontend passes and a successful production build. The focused CPU integration test exercised direct SFT, mid-training followed by SFT, cross-run final-test scoring and restore of the packaged model. Repeat the acceptance scenario on your local checkout and record the tested commit.
 
 ## 1. Start with the existing suites
 
@@ -16,6 +16,12 @@ npm run build --prefix frontend
 python3 scripts/setup_training.py --profile cpu
 .venv/bin/python -m pytest -q --tb=short -rs
 .venv-training/bin/python -m pytest -q backend/training_tests --tb=short -rs
+```
+
+To rerun the two training routes and package restore on a small fixture, use:
+
+```bash
+.venv/bin/python -m pytest -q backend/tests/test_pilot_api.py -k checkpoint_initialization --tb=short -rs
 ```
 
 Use a disposable local PostgreSQL instance. The default backend test fixture creates and drops a temporary database through the local role. If supplying `TEST_DATABASE_URL`, point it to a dedicated disposable test database. Use temporary artifact storage and start the end-to-end scenario from a clean project.

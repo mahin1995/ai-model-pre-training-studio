@@ -2,6 +2,10 @@
 
 Covers M10. Start on the target corpus after [Step 10](STEP_10_FULL_CORPUS_RUNTIME_PLAN.md) qualifies the data and runtime.
 
+## Implementation status
+
+The full profile uses the existing worker queue, epoch coverage, time and disk limits, and bounded checkpoint schedule. Nonempty validation is scored at checkpoint steps after source verification. Training and validation loss are reported separately. Target-budget execution and quality-based base selection remain local acceptance tasks.
+
 ## Work
 
 1. Extend the bounded pilot into a budgeted pre-training path. Preserve immutable run inputs, deterministic data order and checkpoint lineage. Enforce step/time/disk limits and checkpoint retention that preserves checkpoints referenced by other runs or evaluations.

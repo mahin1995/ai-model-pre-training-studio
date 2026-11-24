@@ -13,7 +13,7 @@ from ..training.runtime import select_runtime
 from ..training.storage import check_resources, checked_file
 from .jobs import compatible_runtime
 from .schemas import ACTIVE, AnnotationEdit, EvaluationCreate, GenerationCreate, PromptPreview, PromptSetCreate
-from .source import checkpoint_snapshot, check_prompts, external_snapshot, frozen_tokenizer, prepare_inputs
+from .source import evaluation_snapshot, checkpoint_snapshot, check_prompts, external_snapshot, frozen_tokenizer, prepare_inputs
 
 router=APIRouter(prefix='/api/projects/{project_id}',tags=['inference'])
 
@@ -47,9 +47,21 @@ def sources(project_id: UUID,request: Request):
                 'trainingBlocks':run['source_snapshot']['sequence']['manifest']['counts']['train']['sequences'],
                 'validationBlocks':run['source_snapshot']['sequence']['manifest']['counts']['validation']['sequences'],
                 'testBlocks':run['source_snapshot']['sequence']['manifest']['counts']['test']['sequences'],
-                'checkpoints':[{'id':str(c['id']),'step':c['step'],'eligible':run['status']=='completed' and run['metadata']['permission']=='confirmed' and c['manifest']['checkpoint']['device']=='cpu',
-                    'reason':None if run['status']=='completed' and run['metadata']['permission']=='confirmed' and c['manifest']['checkpoint']['device']=='cpu' else 'Requires a completed CPU-trained run and confirmed source permission.'} for c in cps]})
+                'checkpoints':[{'id':str(c['id']),'step':c['step'],'eligible':run['status']=='completed' and run['metadata']['permission']=='confirmed',
+                    'reason':None if run['status']=='completed' and run['metadata']['permission']=='confirmed' else 'Requires a completed run and confirmed source permission.'} for c in cps]})
         return result
+
+
+def generation_prompt(body, snapshot):
+    from ..tokenizers.sft_template import TEMPLATE_VERSION, format_prompt
+
+    if snapshot['configuration'].get('templateVersion') == TEMPLATE_VERSION:
+        if not body.excerpt or not body.excerpt.strip() or not body.prompt.strip():
+            raise DatasetError('A source excerpt and question are required for this SFT checkpoint.')
+        return format_prompt(body.prompt, body.excerpt)
+    if body.excerpt is not None:
+        raise DatasetError('Select an SFT checkpoint to submit a separate source excerpt.')
+    return body.prompt
 
 
 @router.post('/inference-preview')
@@ -57,9 +69,10 @@ def preview(project_id: UUID,body: PromptPreview,request: Request):
     try:
         with request.app.state.pool.connection() as conn:snapshot=checkpoint_snapshot(conn,request.app.state.data_root,project_id,[body.checkpointId])
         tokenizer,_=frozen_tokenizer(request.app.state.data_root,snapshot)
-        ids=tokenizer.encode(body.prompt,add_special_tokens=False).ids
+        prompt = generation_prompt(body, snapshot)
+        ids=tokenizer.encode(prompt,add_special_tokens=False).ids
         return {'promptTokens':len(ids),'bosTokens':1,'contextLength':snapshot['configuration']['contextLength'],
-                'availableNewTokens':max(0,snapshot['configuration']['contextLength']-len(ids)-1),'roundTripMatches':tokenizer.decode(ids,skip_special_tokens=False)==body.prompt}
+                'availableNewTokens':max(0,snapshot['configuration']['contextLength']-len(ids)-1),'roundTripMatches':tokenizer.decode(ids,skip_special_tokens=False)==prompt}
     except (DatasetError,OSError) as exc:raise HTTPException(409,str(exc) if isinstance(exc,DatasetError) else 'Saved checkpoint files are unavailable.') from None
 
 
@@ -136,7 +149,7 @@ def create_generation(project_id: UUID,body: GenerationCreate,request: Request):
         with request.app.state.pool.connection() as conn:
             snapshot=checkpoint_snapshot(conn,request.app.state.data_root,project_id,[body.checkpointId])
             return enqueue(conn,request.app.state.data_root,project_id,snapshot,
-                {'kind':'generation','maxNewTokens':body.maxNewTokens,'prompts':[{'text':body.prompt,'notes':''}]})
+                {'kind':'generation','maxNewTokens':body.maxNewTokens,'prompts':[{'text':generation_prompt(body, snapshot),'notes':''}]})
     except (DatasetError,OSError) as exc:raise HTTPException(409,str(exc) if isinstance(exc,DatasetError) else 'Inference storage is unavailable.') from None
 
 
@@ -149,7 +162,7 @@ def create_evaluation(project_id: UUID,body: EvaluationCreate,request: Request):
             prompts=prompt_version(conn,project_id,body.promptSetVersionId)
             locked=conn.execute('SELECT id FROM prompt_sets WHERE id=%s FOR UPDATE',(prompts['prompt_set_id'],)).fetchone()
             if not locked:raise HTTPException(404,'Prompt set was deleted before submission. Reload prompt sets.')
-            snapshot=checkpoint_snapshot(conn,request.app.state.data_root,project_id,body.checkpointIds)
+            snapshot=evaluation_snapshot(conn,request.app.state.data_root,project_id,body.checkpointIds,body.metricScope)
             if body.externalDatasetVersionId:
                 snapshot['externalSource']=external_snapshot(conn,request.app.state.data_root,project_id,body.externalDatasetVersionId)
             return enqueue(conn,request.app.state.data_root,project_id,snapshot,
@@ -199,7 +212,8 @@ def register_runs(path,kind):
             with request.app.state.pool.connection() as conn:
                 old=find_inference(conn,project_id,run_id,kind,lock=True)
                 if old['status'] in ACTIVE:raise HTTPException(409,'Finish or cancel this run before retrying.')
-                snapshot=checkpoint_snapshot(conn,request.app.state.data_root,project_id,[c['id'] for c in old['source_snapshot']['checkpoints']])
+                snapshot=evaluation_snapshot(conn,request.app.state.data_root,project_id,
+                    [c['id'] for c in old['source_snapshot']['checkpoints']], old['settings'].get('metricScope'))
                 if old['external_dataset_version_id']:snapshot['externalSource']=external_snapshot(conn,request.app.state.data_root,project_id,old['external_dataset_version_id'])
                 prompts=prompt_version(conn,project_id,old['prompt_set_version_id']) if old['prompt_set_version_id'] else None
                 return enqueue(conn,request.app.state.data_root,project_id,snapshot,old['settings'],prompts)

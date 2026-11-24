@@ -225,11 +225,11 @@ The [test roadmap](TEST_ROADMAP.md) defines code completion checks, the CPU fixt
 | 7 | [Whole-dataset pilot](STEP_7_WHOLE_DATASET_PILOT_PLAN.md) | Bounded CPU run and resume verified |
 | 8 | [Independent evaluation](STEP_8_INDEPENDENT_EVALUATION_PLAN.md) | Small external assessment executed; domain review pending |
 | 9 | [Data quality and controlled pilot](STEP_9_DATA_QUALITY_PILOT_PLAN.md) | Diagnostic run complete; usable generation and source approvals pending |
-| 10 | [Full corpus and target runtime](STEP_10_FULL_CORPUS_RUNTIME_PLAN.md) | Planned (M8–M9) |
-| 11 | [Full pre-training and base evaluation](STEP_11_FULL_PRETRAINING_PLAN.md) | Planned (M10) |
-| 12 | [Optional mid-training](STEP_12_MID_TRAINING_PLAN.md) | Frozen-tokenizer corpus selection implemented; executor pending and real run conditional on a measured domain gap |
-| 13 | [Supervised fine-tuning](STEP_13_SUPERVISED_FINE_TUNING_PLAN.md) | Example preview implemented; dataset, training and integration pending |
-| 14 | [Final evaluation and local release](STEP_14_FINAL_EVALUATION_RELEASE_PLAN.md) | Reserved-test input selection implemented; acceptance and release pending (M11) |
+| 10 | [Full corpus and target runtime](STEP_10_FULL_CORPUS_RUNTIME_PLAN.md) | Bounded full profile implemented; target runtime and approved corpus pending |
+| 11 | [Full pre-training and base evaluation](STEP_11_FULL_PRETRAINING_PLAN.md) | Full-profile job and checkpoint validation implemented; real training and base selection pending |
+| 12 | [Optional mid-training](STEP_12_MID_TRAINING_PLAN.md) | Checkpoint initialization and frozen-tokenizer path implemented; real run conditional on measured domain gap |
+| 13 | [Supervised fine-tuning](STEP_13_SUPERVISED_FINE_TUNING_PLAN.md) | Both CPU fixture routes verified; real SFT corpus and run pending |
+| 14 | [Final evaluation and local release](STEP_14_FINAL_EVALUATION_RELEASE_PLAN.md) | Cross-run final comparison and package restore verified on CPU fixtures; domain acceptance pending |
 
 ## 7. Progress update rule
 
@@ -247,7 +247,7 @@ Prottek milestone complete hole ei file-e corresponding checklist ebong completi
 | M8 Full environment/data preparation | CPU runtime ready; CUDA/full-corpus preparation pending |
 | M9 Model smoke test | CPU fixture verified; target corpus/final capacity and CUDA pending |
 | M10 Pre-training/base evaluation | Bounded CPU pilot/live resume completed; independent assessment and larger training pending |
-| M11 Fine-tuning/final inference | SFT example preview implemented; training, final evaluation and packaging pending |
+| M11 Fine-tuning/final inference | Code path verified with CPU fixtures; real model and release review pending |
 
 ## 8. Completion log
 

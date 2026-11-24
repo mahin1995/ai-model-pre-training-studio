@@ -7,9 +7,11 @@ from ..datasets.router import find_dataset
 from ..datasets.storage import DatasetError, checksum, read_jsonl
 from ..tokenizers.pipeline import load_tokenizer
 from ..tokenizers.router import find_run
+from ..tokenizers.sft import TEMPLATE_VERSION, document_sequence
 from ..tokenizers.source import eligibility, load_documents
 from ..tokenizers.storage import verified_artifact
 from ..training.data import validate_record
+from ..training.pilot import FULL_BLOCK_LIMIT, record_identity, run_limits
 
 
 def take_snapshot(conn, root, project_id, sequence_id):
@@ -60,17 +62,25 @@ def inspect_source(root, snapshot, config=None):
         raise DatasetError('Saved vocabulary size is inconsistent.')
     if config and (config['vocabSize'] != vocab or config['contextLength'] != length):
         raise DatasetError('Model configuration does not match tokenizer/sequence artifacts.')
-    expected = {d['documentId']: {'document': d, 'ids': [2]+tokenizer.encode(d['text'], add_special_tokens=False).ids+[3], 'cursor': 0}
+    sft = sequence['manifest'].get('objective') == 'sft'
+    if sft and sequence['manifest'].get('templateVersion') != TEMPLATE_VERSION:
+        raise DatasetError('Unsupported SFT chat template.')
+    sft_blocks = {d['documentId']: document_sequence(tokenizer, d, length)
+                  for d in documents if sft and d['split'] == 'train'}
+    expected = {d['documentId']: {'document': d, 'ids': (sft_blocks[d['documentId']]['input_ids'][:sum(sft_blocks[d['documentId']]['attention_mask'])]
+                         if sft else [2]+tokenizer.encode(d['text'], add_special_tokens=False).ids+[3]), 'cursor': 0}
                 for d in documents if d['split'] == 'train'}
     selected, records, count = [], [], 0
     for record in read_jsonl(verified_artifact(root, sequence, 'train')):
         try:
-            validate_record(record, vocab, length)
+            validate_record(record, vocab, length, sft)
         except ValueError as exc:
             raise DatasetError(str(exc)) from None
         source = expected.get(record.get('documentId'))
         if not source:
             raise DatasetError('Training sequence has an unknown document.')
+        if sft and any(record[key] != value for key, value in sft_blocks[record['documentId']].items()):
+            raise DatasetError('SFT sequence differs from its reviewed example or answer mask.')
         n = sum(record['attention_mask'])
         start = source['cursor']
         doc = source['document']
@@ -80,23 +90,23 @@ def inspect_source(root, snapshot, config=None):
         source['cursor'] += n
         if len(selected) < 2:
             selected.append(record)
-        if len(records) < 256:
+        if len(records) < FULL_BLOCK_LIMIT:
             records.append(record)
         count += 1
     if not selected or count != sequence['manifest']['counts']['train']['sequences'] or any(d['cursor'] != len(d['ids']) for d in expected.values()):
         raise DatasetError('Training sequence coverage/count is inconsistent.')
     if config and config.get('trainingKind') == 'pilot':
-        from ..training.pilot import record_identity
-        if count > 256 or count != config['trainingBlocks'] or record_identity(records) != config['recordsSha256']:
+        limit, _ = run_limits(config.get('profile'))
+        if count > limit or count != config['trainingBlocks'] or record_identity(records) != config['recordsSha256']:
             raise DatasetError('Pilot full training coverage differs from the saved configuration.')
     if config and len(tokenizer.encode(config['prompt'], add_special_tokens=False).ids)+1+32 > length:
         raise DatasetError('Generation prompt is too long for this context. Use a shorter prompt.')
     return {'vocabSize': vocab, 'contextLength': length, 'subset': selected, 'trainingSequences': count,
-            'tokenizerPath': tokenizer_path, 'trainingRecords': records}
+            'objective': 'sft' if sft else 'causal', 'tokenizerPath': tokenizer_path, 'trainingRecords': records}
 
 
 def current_permission(conn, snapshot):
-    dataset_ids = [snapshot['datasetId']]
+    dataset_ids = [snapshot['datasetId'], *(source['datasetId'] for source in snapshot.get('ancestorDatasets', ()))]
     if fit_source := snapshot.get('tokenizerFitSource'):
         dataset_ids.append(fit_source['datasetId'])
     rows = conn.execute('SELECT metadata FROM datasets WHERE id=ANY(%s::uuid[])', (dataset_ids,)).fetchall()

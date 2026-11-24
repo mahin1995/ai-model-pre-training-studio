@@ -5,10 +5,11 @@ import { PreparationStatus, RunDownloads } from "./PreparationStatus";
 
 export function SequencePanel({ projectId, tokenizer, sources, runs, busy, onCreate, onAction }: {
   projectId: string; tokenizer: PreparationRun; sources: SourceVersion[]; runs: PreparationRun[]; busy: boolean;
-  onCreate: (length: number, datasetVersionId?: string) => Promise<PreparationRun | null>;
+  onCreate: (length: number, datasetVersionId?: string, objective?: "sft") => Promise<PreparationRun | null>;
   onAction: (action: "cancel" | "retry" | "delete", kind: RunKind, run: PreparationRun) => void;
 }) {
   const [datasetVersionId, setDatasetVersionId] = useState("");
+  const [sft, setSft] = useState(false);
   const [length, setLength] = useState(512);
   const [selectedId, setSelectedId] = useState("");
   const [split, setSplit] = useState<SplitName>("train");
@@ -34,9 +35,12 @@ export function SequencePanel({ projectId, tokenizer, sources, runs, busy, onCre
         {sources.filter((source) => source.eligible && source.versionId !== tokenizer.datasetVersionId).map((source) =>
           <option key={source.versionId} value={source.versionId}>{source.datasetName} · v{source.version}</option>)}
       </select></label>
+      <label>Training objective<select value={sft ? "sft" : "causal"} disabled={busy} onChange={(e) => setSft(e.target.value === "sft")}>
+        <option value="causal">Next-token prediction</option><option value="sft">Source Q&A fine-tuning</option>
+      </select></label>
       <label>Sequence length<select aria-label="Sequence length" value={length} disabled={busy} onChange={(e) => setLength(Number(e.target.value))}>{[128, 256, 512, 1024].map((value) => <option key={value} value={value}>{value} tokens</option>)}</select></label>
-      <button className="primary" disabled={busy || activeRun(tokenizer)} onClick={() => void onCreate(length, datasetVersionId || undefined).then((run) => { if (run) { setSelectedId(run.id); setPage(1); } })}>Generate sequences</button></div>
-    <p className="dataset-caption">Non-overlapping blocks · right padding · labels stay unshifted · padding labels = -100. No model is trained here.</p>
+      <button className="primary" disabled={busy || activeRun(tokenizer)} onClick={() => void onCreate(length, datasetVersionId || undefined, sft ? "sft" : undefined).then((run) => { if (run) { setSelectedId(run.id); setPage(1); } })}>Generate sequences</button></div>
+    {sft && <p className="dataset-caption">Each reviewed document must contain one JSON object with question, excerpt and answer fields.</p>}
     {runs.length > 0 && <><label>Sequence run<select aria-label="Sequence run" value={selected?.id ?? ""} onChange={(e) => { setSelectedId(e.target.value); setPage(1); }}>
       {runs.map((run) => <option key={run.id} value={run.id}>{run.datasetName} · v{run.datasetVersion} · {run.settings.sequenceLength} tokens · {run.status} · {new Date(run.createdAt).toLocaleString()}</option>)}
     </select></label>
