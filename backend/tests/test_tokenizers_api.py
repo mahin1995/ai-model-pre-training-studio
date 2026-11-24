@@ -14,6 +14,7 @@ import pytest
 
 from app.datasets.storage import storage_path
 from app.main import create_app
+from app.models.source import current_permission, take_snapshot
 from app.tokenizers.jobs import child_environment, claim_preparation, execute_preparation, recover_preparation
 from test_dataset_corrections import prepared, run_job, save_all
 
@@ -231,3 +232,50 @@ def test_source_qa_preview_masks_prompt_and_padding(studio, test_database):
     assert studio.post(path, json={**body, "contextLength": 8}).status_code == 422
     assert studio.post(path, json={**body, "answer": " "}).status_code == 422
     assert studio.post(path.replace(base, f"/api/projects/{uuid4()}"), json=body).status_code == 404
+
+
+def test_frozen_tokenizer_encodes_separate_reviewed_version(studio, test_database):
+    base, path, _, original = source(studio, test_database)
+    tokenizer = train(studio, test_database, base, original)
+    correction, revision = save_all(studio, path, original, {1: "নতুন সংস্করণ"})
+    assert studio.post(correction + "/publish", json={"revision": revision}).status_code == 202
+    run_job(studio, test_database)
+    revised = studio.get(path).json()["versions"][0]
+    assert revised["id"] != original["id"]
+
+    api = base + "/sequence-runs"
+    body = {"tokenizerRunId": tokenizer["id"], "sequenceLength": 128}
+    assert studio.post(api, json={**body, "datasetVersionId": str(uuid4())}).status_code == 404
+    result = studio.post(api, json={**body, "datasetVersionId": revised["id"]})
+    assert result.status_code == 202, result.text
+    execute(studio, test_database)
+    completed = studio.get(f"{api}/{result.json()['id']}").json()
+    assert completed["status"] == "completed", completed["error"]
+    manifest = completed["manifest"]
+    assert manifest["source"]["datasetVersionId"] == revised["id"]
+    assert manifest["tokenizerSource"]["datasetVersionId"] == original["id"]
+    assert manifest["tokenizerSha256"] == tokenizer["manifest"]["artifacts"]["tokenizer"]["sha256"]
+
+    with psycopg.connect(test_database, row_factory=dict_row) as conn:
+        snapshot = take_snapshot(conn, studio.app.state.data_root, base.rsplit("/", 1)[-1], completed["id"])
+        assert snapshot["tokenizerFitSource"]["datasetVersionId"] == original["id"]
+        current_permission(conn, snapshot)
+
+
+def test_reserved_test_inputs_match_published_test_split(studio, test_database):
+    from app.inference.source import prepare_inputs
+
+    base, _, detail, version = source(studio, test_database, split=True)
+    tokenizer = train(studio, test_database, base, version)
+    response = studio.post(base + "/sequence-runs", json={"tokenizerRunId": tokenizer["id"], "sequenceLength": 128})
+    assert response.status_code == 202, response.text
+    execute(studio, test_database)
+    root = studio.app.state.data_root
+    with psycopg.connect(test_database, row_factory=dict_row) as conn:
+        snapshot = take_snapshot(conn, root, detail["projectId"], response.json()["id"])
+    config = {"contextLength": 128, "vocabSize": tokenizer["manifest"]["actualVocabSize"], "prompt": "Test"}
+    settings = {"kind": "evaluation", "metricScope": "test", "prompts": [{"text": "Test"}], "maxNewTokens": 8}
+    result = prepare_inputs(root, {"trainingSource": snapshot, "configuration": config}, settings)
+    assert result["heldOutAvailable"]
+    assert len(result["records"]) == snapshot["sequence"]["manifest"]["counts"]["test"]["sequences"]
+    assert {record["split"] for record in result["records"]} == {"test"}

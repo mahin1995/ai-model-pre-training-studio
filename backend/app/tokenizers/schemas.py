@@ -23,6 +23,7 @@ class TokenizerCreate(Model):
 
 class SequenceCreate(Model):
     tokenizerRunId: UUID
+    datasetVersionId: UUID | None = None
     sequenceLength: Literal[128, 256, 512, 1024] = 512
 
     @model_validator(mode="before")

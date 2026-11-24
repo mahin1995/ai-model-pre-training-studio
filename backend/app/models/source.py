@@ -29,7 +29,14 @@ def take_snapshot(conn, root, project_id, sequence_id):
     dataset_snapshot = {k: v for k, v in sequence['source_snapshot'].items() if k != 'tokenizer'}
     identity = hashlib.sha256(json.dumps({'sequenceId': str(sequence_id), 'manifest': sequence['manifest'],
                                         'tokenizerManifest': tokenizer['manifest']}, sort_keys=True).encode()).hexdigest()
-    return {'dataset': dataset_snapshot, 'sequence': artifact_row(sequence), 'tokenizer': artifact_row(tokenizer),
+    fit_source = tokenizer['source_snapshot']
+    fit_metadata = find_dataset(conn, project_id, tokenizer['dataset_id'])['metadata']
+    if fit_metadata['permission'] != 'confirmed':
+        raise HTTPException(409, 'Confirm the tokenizer source usage permission before using these sequences.')
+    fit_provenance = {}
+    if fit_source['datasetVersionId'] != dataset_snapshot['datasetVersionId']:
+        fit_provenance['tokenizerFitSource'] = fit_source
+    return {**fit_provenance, 'dataset': dataset_snapshot, 'sequence': artifact_row(sequence), 'tokenizer': artifact_row(tokenizer),
             'datasetId': str(sequence['dataset_id']), 'datasetVersionId': str(sequence['dataset_version_id']),
             'tokenizerRunId': str(sequence['tokenizer_run_id']), 'sequenceRunId': str(sequence_id),
             'datasetName': dataset['metadata']['name'], 'datasetVersion': dataset_snapshot['datasetVersion'],
@@ -89,6 +96,9 @@ def inspect_source(root, snapshot, config=None):
 
 
 def current_permission(conn, snapshot):
-    row = conn.execute('SELECT metadata FROM datasets WHERE id=%s', (snapshot['datasetId'],)).fetchone()
-    if not row or row['metadata']['permission'] != 'confirmed':
+    dataset_ids = [snapshot['datasetId']]
+    if fit_source := snapshot.get('tokenizerFitSource'):
+        dataset_ids.append(fit_source['datasetId'])
+    rows = conn.execute('SELECT metadata FROM datasets WHERE id=ANY(%s::uuid[])', (dataset_ids,)).fetchall()
+    if len(rows) != len(set(dataset_ids)) or any(row['metadata']['permission'] != 'confirmed' for row in rows):
         raise DatasetError('Confirm current dataset usage permission before training.')

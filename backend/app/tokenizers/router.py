@@ -92,17 +92,20 @@ def create_tokenizer(project_id: UUID, body: TokenizerCreate, request: Request):
 
 @sequence_router.post("", status_code=202)
 def create_sequences(project_id: UUID, body: SequenceCreate, request: Request):
+    root = request.app.state.data_root
     with request.app.state.pool.connection() as conn:
         tokenizer = find_run(conn, project_id, body.tokenizerRunId, "tokenizer")
-        find_dataset(conn, project_id, tokenizer["dataset_id"], lock=True)
+        version_id = body.datasetVersionId or tokenizer["dataset_version_id"]
+        # Lock the target dataset before the tokenizer, matching model snapshot creation.
+        snapshot = source_snapshot(conn, root, project_id, version_id)
         tokenizer = find_run(conn, project_id, body.tokenizerRunId, "tokenizer", lock=True)
         if tokenizer["status"] != "completed":
             raise HTTPException(409, "Choose a successfully completed tokenizer.")
-        dataset = find_dataset(conn, project_id, tokenizer["dataset_id"])
-        if dataset["metadata"]["permission"] != "confirmed":
-            raise HTTPException(409, "Confirm dataset usage permission before generating sequences.")
-        snapshot = {**tokenizer["source_snapshot"], "tokenizer": {"status": "completed", "storage_key": tokenizer["storage_key"], "manifest": tokenizer["manifest"]}}
-        return enqueue(conn, request.app.state.data_root, project_id, "sequence", snapshot,
+        fit_dataset = find_dataset(conn, project_id, tokenizer["dataset_id"])
+        if fit_dataset["metadata"]["permission"] != "confirmed":
+            raise HTTPException(409, "Confirm the tokenizer source usage permission before generating sequences.")
+        snapshot["tokenizer"] = {key: tokenizer[key] for key in ("status", "storage_key", "manifest")}
+        return enqueue(conn, root, project_id, "sequence", snapshot,
                        {"sequenceLength": body.sequenceLength}, body.tokenizerRunId)
 
 
@@ -192,6 +195,11 @@ def register_common(router, kind):
                 raise HTTPException(409, "Finish or cancel the active run before retrying.")
             if dataset["metadata"]["permission"] != "confirmed":
                 raise HTTPException(409, "Confirm source permission before retrying.")
+            if kind == "sequence":
+                tokenizer = find_run(conn, project_id, previous["tokenizer_run_id"], "tokenizer", lock=True)
+                fit_dataset = find_dataset(conn, project_id, tokenizer["dataset_id"])
+                if fit_dataset["metadata"]["permission"] != "confirmed":
+                    raise HTTPException(409, "Confirm the tokenizer source usage permission before retrying.")
             return enqueue(conn, request.app.state.data_root, project_id, kind, previous["source_snapshot"],
                            previous["settings"], previous.get("tokenizer_run_id"))
 

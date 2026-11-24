@@ -46,6 +46,7 @@ def sources(project_id: UUID,request: Request):
                 'tokenizerSha256':run['source_snapshot']['tokenizer']['manifest']['artifacts']['tokenizer']['sha256'],
                 'trainingBlocks':run['source_snapshot']['sequence']['manifest']['counts']['train']['sequences'],
                 'validationBlocks':run['source_snapshot']['sequence']['manifest']['counts']['validation']['sequences'],
+                'testBlocks':run['source_snapshot']['sequence']['manifest']['counts']['test']['sequences'],
                 'checkpoints':[{'id':str(c['id']),'step':c['step'],'eligible':run['status']=='completed' and run['metadata']['permission']=='confirmed' and c['manifest']['checkpoint']['device']=='cpu',
                     'reason':None if run['status']=='completed' and run['metadata']['permission']=='confirmed' and c['manifest']['checkpoint']['device']=='cpu' else 'Requires a completed CPU-trained run and confirmed source permission.'} for c in cps]})
         return result

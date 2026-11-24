@@ -2,6 +2,10 @@
 
 Completes M11 after [Step 13](STEP_13_SUPERVISED_FINE_TUNING_PLAN.md) produces a qualified candidate. Local document study is the release target. External serving, quantization and adapter merging are conditional on the target and require revalidation if selected.
 
+## Implementation status
+
+Evaluation can select the reserved test split from a checkpoint's published sequence artifact. The backend verifies the split against the frozen tokenizer and reviewed source before scoring. The final acceptance protocol, SFT candidate evaluation and release package still need implementation and execution.
+
 ## Work
 
 1. Freeze the selected checkpoint, evaluator, decoding parameters, task rubric and acceptance thresholds. Compare the base and selected candidate once on reserved test documents and prompts. Record correctness, whether each citation supports its claim, treatment of insufficient excerpts, Bangla quality, repetition and general-language regression.

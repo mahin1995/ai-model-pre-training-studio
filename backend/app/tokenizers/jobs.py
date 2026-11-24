@@ -131,6 +131,7 @@ def execute_preparation(conn, root, kind, run, stopping):
                              "documents": snapshot["manifest"]["artifacts"]["documents"]["sha256"]}}
         if kind == "sequence":
             manifest["tokenizerRunId"] = str(run["tokenizer_run_id"])
+            manifest["tokenizerSource"] = snapshot["tokenizer"]["manifest"]["source"]
             manifest["tokenizerSha256"] = snapshot["tokenizer"]["manifest"]["artifacts"]["tokenizer"]["sha256"]
             for key, filename in (("tokenizer", "tokenizer.json"), ("config", "tokenizer_config.json"), ("special_tokens", "special_tokens_map.json")):
                 shutil.copyfile(tokenizer_files[filename], staging / filename)

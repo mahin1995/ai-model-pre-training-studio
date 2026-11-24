@@ -2,6 +2,10 @@
 
 This is the conditional bridge from M10 to M11 in the [use-case plan](MID_TRAINING_FINE_TUNING_PLAN.md). A qualified base can go directly to [Step 13](STEP_13_SUPERVISED_FINE_TUNING_PLAN.md). Record the decision using development evaluation.
 
+## Implementation status
+
+Sequence generation can now select a reviewed corpus version while reusing a saved tokenizer. The manifest records the corpus version and tokenizer fit source separately. Model source snapshots retain both sources for permission and held-out overlap checks. The mid-training executor and its stage-specific checkpoint lineage still need implementation.
+
 ## Work
 
 1. Choose a measurable domain gap, such as weak aviation terminology completion on held-out development documents. Set a budget, a target improvement and a general-language regression threshold before running.

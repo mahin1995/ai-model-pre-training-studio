@@ -63,10 +63,10 @@ function TokenizerWorkspace({ projectId, onDatasets }: { projectId: string; onDa
     } catch (e) { setError(e instanceof Error ? e.message : "Run action failed."); }
     finally { setBusy(false); }
   }
-  async function generate(length: number) {
+  async function generate(length: number, datasetVersionId?: string) {
     if (!selected) return null;
     setBusy(true); setError(""); setNotice("");
-    try { const run = await startSequences(projectId, selected.id, length); setSequences((current) => [run, ...current]); setNotice("Sequence run created. Track its status below."); return run; }
+    try { const run = await startSequences(projectId, selected.id, length, datasetVersionId); setSequences((current) => [run, ...current]); setNotice("Sequence run created. Track its status below."); return run; }
     catch (e) { setError(e instanceof Error ? e.message : "Could not generate sequences."); return null; }
     finally { setBusy(false); }
   }
@@ -91,7 +91,7 @@ function TokenizerWorkspace({ projectId, onDatasets }: { projectId: string; onDa
           <code className="tokenizer-checksum">Tokenizer SHA-256 {selected.manifest.artifacts.tokenizer.sha256}</code>
           <RunDownloads projectId={projectId} kind="tokenizers" run={selected} artifacts={[["tokenizer", "Tokenizer JSON"], ["config", "Tokenizer configuration"], ["special_tokens", "Special tokens"], ["manifest", "Tokenizer manifest"]]}/>
           <TokenizerPlayground key={selected.id} projectId={projectId} runId={selected.id}/>
-          <SequencePanel key={"sequence-" + selected.id} projectId={projectId} tokenizer={selected} runs={sequences.filter((run) => run.tokenizerRunId === selected.id)} busy={busy} onCreate={generate} onAction={(...args) => void action(...args)}/>
+          <SequencePanel key={"sequence-" + selected.id} projectId={projectId} tokenizer={selected} sources={sources} runs={sequences.filter((run) => run.tokenizerRunId === selected.id)} busy={busy} onCreate={generate} onAction={(...args) => void action(...args)}/>
         </>}
       </section>}
     </> : <section className="empty-card"><Cpu size={34}/><h2>Your tokenizer starts with reviewed text.</h2><p>Select a reviewed version above. No tokenizer or model has been trained yet.</p></section>}

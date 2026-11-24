@@ -1,6 +1,6 @@
 import type { ModelConfiguration, TrainingRuntime } from "./training";
 export type InferenceKind = "generation" | "evaluation";
-export type InferenceSource = { id: string; createdAt: string; status: string; datasetName: string; currentDatasetName: string; datasetVersion: number; configuration: ModelConfiguration; runtime: TrainingRuntime; tokenizerSha256: string; trainingBlocks: number; validationBlocks: number; checkpoints: { id: string; step: number; eligible: boolean; reason: string | null }[] };
+export type InferenceSource = { id: string; createdAt: string; status: string; datasetName: string; currentDatasetName: string; datasetVersion: number; configuration: ModelConfiguration; runtime: TrainingRuntime; tokenizerSha256: string; trainingBlocks: number; validationBlocks: number; testBlocks: number; checkpoints: { id: string; step: number; eligible: boolean; reason: string | null }[] };
 export type Prompt = { text: string; notes: string };
 export type PromptSetDraft = { id?: string; name: string; language: "bn" | "en" | "mixed"; prompts: Prompt[] };
 export type PromptVersion = PromptSetDraft & { id: string; promptSetId: string; version: number; createdAt: string };

@@ -59,7 +59,7 @@ class EvaluationCreate(Model):
     checkpointIds: Annotated[list[UUID], Field(min_length=1,max_length=4)]
     promptSetVersionId: UUID
     maxNewTokens: StrictInt = 32
-    metricScope: Literal['training','validation','external'] = 'training'
+    metricScope: Literal['training','validation','test','external'] = 'training'
     externalDatasetVersionId: UUID | None = None
 
     @model_validator(mode='after')

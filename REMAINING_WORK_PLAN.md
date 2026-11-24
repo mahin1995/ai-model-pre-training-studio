@@ -225,9 +225,9 @@ UI/API preparation age kora jabe; final runtime integration ebong end-to-end val
 | 9 | [Data quality and controlled pilot](STEP_9_DATA_QUALITY_PILOT_PLAN.md) | Diagnostic run complete; usable generation and source approvals pending |
 | 10 | [Full corpus and target runtime](STEP_10_FULL_CORPUS_RUNTIME_PLAN.md) | Planned (M8–M9) |
 | 11 | [Full pre-training and base evaluation](STEP_11_FULL_PRETRAINING_PLAN.md) | Planned (M10) |
-| 12 | [Optional mid-training](STEP_12_MID_TRAINING_PLAN.md) | Conditional on a measured domain gap |
+| 12 | [Optional mid-training](STEP_12_MID_TRAINING_PLAN.md) | Frozen-tokenizer corpus selection implemented; executor pending and real run conditional on a measured domain gap |
 | 13 | [Supervised fine-tuning](STEP_13_SUPERVISED_FINE_TUNING_PLAN.md) | Example preview implemented; dataset, training and integration pending |
-| 14 | [Final evaluation and local release](STEP_14_FINAL_EVALUATION_RELEASE_PLAN.md) | Planned (M11) |
+| 14 | [Final evaluation and local release](STEP_14_FINAL_EVALUATION_RELEASE_PLAN.md) | Reserved-test input selection implemented; acceptance and release pending (M11) |
 
 ## 7. Progress update rule
 

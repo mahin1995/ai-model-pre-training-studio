@@ -74,7 +74,9 @@ def reject_overlap(root,training,target,train_documents,target_documents):
         raise DatasetError('External evaluation duplicates cleaned training-document content.')
     def records(s):return list(read_jsonl(storage_path(root,s['storageKey'])/'processed.jsonl'))
     train_ids={i for d in train_documents for i in d['recordIds']}
-    a=[r for r in records(training) if r['id'] in train_ids];b=records(target)
+    target_ids={i for d in target_documents for i in d['recordIds']}
+    a=[r for r in records(training) if r['id'] in train_ids]
+    b=[r for r in records(target) if r['id'] in target_ids]
     if {text_hash(r['text']) for r in a}&{text_hash(r['text']) for r in b}:
         raise DatasetError('External evaluation duplicates cleaned training-record content.')
     # Manually supplied group labels are dataset-scoped. PDF hash groups are global.
@@ -114,25 +116,37 @@ def prepare_inputs(root,snapshot,settings):
     train_docs=[d for d in training_docs if d['split']=='train']
     pilot = config.get('trainingKind') == 'pilot'
     result['subsetRecords']=inspected['trainingRecords'] if pilot else inspected['subset']
+    fit_source = original.get('tokenizerFitSource')
     if settings['metricScope']=='external':
         target=snapshot['externalSource']
         documents=load_documents(root,target)
         reject_overlap(root,original['dataset'],target,train_docs,documents)
+        if fit_source:
+            fit_documents = [doc for doc in load_documents(root, fit_source) if doc['split'] == 'train']
+            reject_overlap(root, fit_source, target, fit_documents, documents)
         records=encode_documents(documents,tokenizer,config['contextLength'])
         result['heldOutAvailable']=True
         result['warnings'].append('External evaluation uses frozen tokenizer encoding; exact overlap checks cannot rule out near-duplicates. Review independence manually.')
     else:
-        split='train' if settings['metricScope']=='training' else 'validation'
+        scope = settings['metricScope']
+        split = 'train' if scope == 'training' else scope
         records=[]
         for record in read_jsonl(verified_artifact(root,sequence,split)):
             records.append(record)
             if len(records)>MAX_BLOCKS:raise DatasetError('Evaluation exceeds 256 blocks. No records were silently sampled.')
         if len(records)!=sequence['manifest']['counts'][split]['sequences']:
             raise DatasetError('Evaluation block count differs from the source manifest.')
-        if split=='validation':
+        if split in {'validation', 'test'}:
             # Verify the immutable split against frozen-tokenizer reconstruction.
-            expected=encode_documents([d for d in training_docs if d['split']==split],tokenizer,config['contextLength'])
-            if records!=expected:raise DatasetError('Validation blocks differ from reviewed document content.')
+            held_out_docs = [doc for doc in training_docs if doc['split'] == split]
+            if fit_source and held_out_docs:
+                fit_documents = [doc for doc in load_documents(root, fit_source) if doc['split'] == 'train']
+                reject_overlap(root, fit_source, original['dataset'], fit_documents, held_out_docs)
+            expected=encode_documents(held_out_docs,tokenizer,config['contextLength'])
+            if records != expected:
+                raise DatasetError('Held-out blocks differ from reviewed document content.')
+            if split == 'test' and not records:
+                raise DatasetError('This checkpoint has no reserved test blocks.')
             result['heldOutAvailable']=bool(records)
     for record in records:
         try:validate_block(record,config['vocabSize'],config['contextLength'])
