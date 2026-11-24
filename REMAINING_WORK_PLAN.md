@@ -212,6 +212,8 @@ UI/API preparation age kora jabe; final runtime integration ebong end-to-end val
 
 ### Step plan index
 
+The [test roadmap](TEST_ROADMAP.md) defines code completion checks, the CPU fixture run, and acceptance on the target runtime.
+
 | Step | Plan | Current position |
 | --- | --- | --- |
 | 1 | [UI foundation](STEP_1_UI_PLAN.md) | Delivered |
