@@ -167,7 +167,11 @@ Latest verification (2026-11-17): **89 backend + 36 frontend + 15 numerical test
 
 **Done when:** Base model checkpoint ebong evaluation report ready. Base model instruction-following quality automatically assumed hobe na.
 
-### M11 — Fine-tuning + final evaluation/inference
+### M11 — Use-case-based mid-training and post-training
+
+Implementation and acceptance criteria are in the [mid-training and fine-tuning plan](MID_TRAINING_FINE_TUNING_PLAN.md). Mid-training is an optional bridge from M10 to supervised fine-tuning. Each project can choose direct SFT from an eligible base checkpoint or compare it with mid-training followed by SFT. The first use case is source-backed Bangla aviation document Q&A.
+
+#### M11 — Fine-tuning + final evaluation/inference
 
 - [ ] Permission-compatible SFT data collect/clean/split; pre-training/evaluation overlap review.
 - [ ] Same tokenizer, consistent chat template, assistant-response loss mask ebong truncation policy verify.

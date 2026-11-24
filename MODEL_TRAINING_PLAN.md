@@ -127,6 +127,10 @@ Perplexity comparison meaningful hote hole tokenizer ebong evaluation setup cons
 
 **Output:** Base evaluation report ebong fine-tuning-er selected checkpoint.
 
+### Optional between base evaluation and fine-tuning — Mid-training
+
+Use continued pre-training on reviewed domain documents when the base model shows a measurable domain-language gap. Use the same base tokenizer and evaluate against the original checkpoint before selecting a parent for SFT. See the [mid-training and fine-tuning plan](MID_TRAINING_FINE_TUNING_PLAN.md) for route selection, checkpoint lineage and acceptance criteria.
+
 ## 12. Phase 9 — Fine-tuning dataset preparation
 
 - [ ] Desired behavior/task-er instruction-response ba multi-turn conversation collect/create kora.

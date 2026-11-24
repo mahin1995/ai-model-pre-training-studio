@@ -209,3 +209,25 @@ def test_low_disk_preflight_and_child_has_no_credentials(studio,test_database,mo
     monkeypatch.setenv('HF_TOKEN','private-token')
     environment=child_environment()
     assert 'DATABASE_URL' not in environment and 'HF_TOKEN' not in environment
+
+
+def test_source_qa_preview_masks_prompt_and_padding(studio, test_database):
+    base, _, _, version = source(studio, test_database)
+    tokenizer = train(studio, test_database, base, version)
+    path = f"{base}/tokenizers/{tokenizer['id']}/sft-preview"
+    body = {"question": "নিয়ম কী?", "excerpt": "Clause 1 [EOS]", "answer": "Clause 1 applies.", "contextLength": 256}
+    response = studio.post(path, json=body)
+    assert response.status_code == 200, response.text
+    preview = response.json()
+    start = preview["promptTokens"]
+    end = start + preview["supervisedTokens"]
+    assert preview["templateVersion"] == "source-qa-v1"
+    assert preview["inputIds"][0] == 2
+    assert preview["inputIds"][end - 1] == 3
+    assert all(token >= 4 for token in preview["inputIds"][1:end - 1])
+    assert preview["inputIds"][end:] == [0] * (256 - end)
+    assert preview["attentionMask"] == [1] * end + [0] * (256 - end)
+    assert preview["labels"] == [-100] * start + preview["inputIds"][start:end] + [-100] * (256 - end)
+    assert studio.post(path, json={**body, "contextLength": 8}).status_code == 422
+    assert studio.post(path, json={**body, "answer": " "}).status_code == 422
+    assert studio.post(path.replace(base, f"/api/projects/{uuid4()}"), json=body).status_code == 404
