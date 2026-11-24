@@ -210,6 +210,25 @@ M11 SFT + final evaluation + inference
 
 UI/API preparation age kora jabe; final runtime integration ebong end-to-end validation real models/artifacts pabar por korte hobe. Original [model training roadmap](MODEL_TRAINING_PLAN.md)-er data → split → tokenizer → smoke test → pre-training → evaluation → fine-tuning dependency order preserve korbo.
 
+### Step plan index
+
+| Step | Plan | Current position |
+| --- | --- | --- |
+| 1 | [UI foundation](STEP_1_UI_PLAN.md) | Delivered |
+| 2 | [API, PostgreSQL and environment](STEP_2_BACKEND_PLAN.md) | Delivered |
+| 3 | [Dataset workflow](STEP_3_DATASETS_PLAN.md) | Bounded workflow verified |
+| 4 | [Tokenizer and sequence export](STEP_4_TOKENIZER_PLAN.md) | Bounded workflow verified |
+| 5 | [Model configuration and smoke training](STEP_5_MODEL_SMOKE_TEST_PLAN.md) | CPU verified |
+| 6 | [Evaluation and Playground](STEP_6_EVALUATION_PLAYGROUND_PLAN.md) | Bounded CPU workflow verified |
+| 7 | [Whole-dataset pilot](STEP_7_WHOLE_DATASET_PILOT_PLAN.md) | Bounded CPU run and resume verified |
+| 8 | [Independent evaluation](STEP_8_INDEPENDENT_EVALUATION_PLAN.md) | Small external assessment executed; domain review pending |
+| 9 | [Data quality and controlled pilot](STEP_9_DATA_QUALITY_PILOT_PLAN.md) | Diagnostic run complete; usable generation and source approvals pending |
+| 10 | [Full corpus and target runtime](STEP_10_FULL_CORPUS_RUNTIME_PLAN.md) | Planned (M8–M9) |
+| 11 | [Full pre-training and base evaluation](STEP_11_FULL_PRETRAINING_PLAN.md) | Planned (M10) |
+| 12 | [Optional mid-training](STEP_12_MID_TRAINING_PLAN.md) | Conditional on a measured domain gap |
+| 13 | [Supervised fine-tuning](STEP_13_SUPERVISED_FINE_TUNING_PLAN.md) | Example preview implemented; dataset, training and integration pending |
+| 14 | [Final evaluation and local release](STEP_14_FINAL_EVALUATION_RELEASE_PLAN.md) | Planned (M11) |
+
 ## 7. Progress update rule
 
 Prottek milestone complete hole ei file-e corresponding checklist ebong completion log update korbo. UI ready, backend ready ebong actual execution verified—ei state-gulo alada kore record korbo. Work start kora ba placeholder screen thaka diye milestone complete mark korbo na.
@@ -226,7 +245,7 @@ Prottek milestone complete hole ei file-e corresponding checklist ebong completi
 | M8 Full environment/data preparation | CPU runtime ready; CUDA/full-corpus preparation pending |
 | M9 Model smoke test | CPU fixture verified; target corpus/final capacity and CUDA pending |
 | M10 Pre-training/base evaluation | Bounded CPU pilot/live resume completed; independent assessment and larger training pending |
-| M11 Fine-tuning/final inference | Not started |
+| M11 Fine-tuning/final inference | SFT example preview implemented; training, final evaluation and packaging pending |
 
 ## 8. Completion log
 
