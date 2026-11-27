@@ -28,18 +28,26 @@ def main(directory):
         tokenizer = Tokenizer.from_file(str(directory/'tokenizer.json'))
         tokenizer.encode_special_tokens = True
         tokenizer.no_truncation(); tokenizer.no_padding()
-        ids = [2] + tokenizer.encode(config['prompt'], add_special_tokens=False).ids
-        if len(ids)+32 > config['contextLength']:
+        prompt = config['prompt']
+        if config.get('objective') == 'sft':
+            first = records[0]
+            prompt_end = next(index for index, label in enumerate(first['labels']) if label != -100)
+            ids = first['input_ids'][:prompt_end]
+            prompt = tokenizer.decode(ids[1:], skip_special_tokens=False)
+        else:
+            ids = [2] + tokenizer.encode(prompt, add_special_tokens=False).ids
+        maximum = min(32, config['contextLength'] - len(ids))
+        if maximum < 1:
             raise ValueError('Prompt exceeds the generation context budget. Save a shorter prompt.')
         source = torch.tensor([ids], device=request['device'])
         generated = model.generate(input_ids=source, attention_mask=torch.ones_like(source),
-            max_new_tokens=32, do_sample=False, use_cache=True, pad_token_id=0, bos_token_id=2, eos_token_id=3,
+            max_new_tokens=maximum, do_sample=False, use_cache=True, pad_token_id=0, bos_token_id=2, eos_token_id=3,
             suppress_tokens=[0, 1, 2])
         full = generated[0].tolist()
-        if len(full) > len(ids)+32 or any(t < 0 or t >= config['vocabSize'] for t in full):
+        if len(full) > len(ids)+maximum or any(t < 0 or t >= config['vocabSize'] for t in full):
             raise ValueError('Generation produced invalid output IDs.')
     write_json(directory/'verification.json', {'reloadMatches': True, 'tolerance': tolerance,
-        'generationValid': True, 'sample': {'prompt': config['prompt'], 'tokenIds': full,
+        'generationValid': True, 'sample': {'prompt': prompt, 'tokenIds': full,
         'newTokenIds': full[len(ids):], 'text': tokenizer.decode(full[len(ids):], skip_special_tokens=True).replace('\x00', r'\u0000')}})
 
 

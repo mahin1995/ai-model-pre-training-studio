@@ -362,3 +362,38 @@ Inference endpoints (same project prefix):
 
 - [Independent evaluation plan](STEP_8_INDEPENDENT_EVALUATION_PLAN.md)
 - [Step 8 baseline review](artifacts/STEP_8_EVALUATION_REVIEW.md)
+
+### Continued training, source Q&A and local restore
+
+In **Tokenizer**, generate sequences from a reviewed corpus using the original saved tokenizer. In **Model Config**, use a whole-dataset configuration and select either the pilot budget or the full budget. The full profile accepts up to 2,048 training blocks, 10,000 updates, and an explicit CPU or CUDA device, subject to the checkpoint storage budget. Runs score a nonempty validation split at checkpoint steps when the split passes independence checks. Use Evaluation to select a checkpoint before opening the reserved test split.
+
+For mid-training, select a compatible checkpoint under **Initialize weights** and start a new run on the domain corpus. The new run begins at step zero with a fresh optimizer. **Resume** restores an earlier step of the same run.
+
+For supervised fine-tuning, import source-backed examples as JSONL. Each line uses the normal dataset envelope. The `text` string contains a JSON object with `question`, `excerpt` and `answer`. Use `group_id` to keep examples from the same source family together.
+
+```jsonl
+{"group_id":"fixture-manual-a","text":"{\"question\":\"What does clause 1 require?\",\"excerpt\":\"Clause 1 requires a record.\",\"answer\":\"Keep a record, as required by clause 1.\"}"}
+```
+
+Review and publish the examples, then choose **Source Q&A fine-tuning** in **Tokenizer** to generate one masked training block per example. Save a whole-dataset configuration with these sequences and initialize from the base or mid-trained checkpoint. The checkpoint and sequences must use the same tokenizer and model dimensions. **Playground** shows a source excerpt and question for these checkpoints.
+
+Download the training bundle and extract it to a directory. From the repository root, use the pinned training environment to verify the packaged checkpoint and generate locally.
+
+```bash
+PYTHONPATH=backend .venv-training/bin/python -m app.inference.local /path/to/extracted-bundle \
+  --prompt 'What does clause 1 require?' --excerpt 'Clause 1 requires a record.' --max-new-tokens 16
+```
+
+For plain completion checkpoints, supply the prompt only. The restore command verifies the tokenizer, model files, configuration and source identity before loading the model. See the [test roadmap](TEST_ROADMAP.md) for software verification and final model acceptance.
+
+
+To compare base and fine-tuned checkpoints, select **Independent Q&A final-test split** in Evaluation, choose the reserved reviewed Q&A corpus, and select compatible checkpoints across runs. Use the same prompt set for every candidate. For source Q&A prompts, use the `Source: "…"\nQuestion: "…"\nAnswer:\n` template with actual line breaks and JSON-quoted values. Review answer correctness and clause support before choosing a model for release.
+
+After review, download the final-test report and prepare a model card that records the accepted scope and limitations. Package the selected checkpoint, tokenizer, report and model card together.
+
+```bash
+PYTHONPATH=backend .venv-training/bin/python -m app.inference.release \
+  /path/to/extracted-bundle final-evaluation.json model-card.md studio-release.zip
+```
+
+Extract the release ZIP and use the same local restore command above. The release includes only inference files from the selected checkpoint and leaves optimizer and RNG state in the original training bundle.

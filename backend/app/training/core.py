@@ -13,7 +13,7 @@ import torch
 from transformers import GPT2Config, GPT2LMHeadModel
 
 from .data import describe, digest, validate_record, write_json
-from .pilot import coverage, epoch_order, record_identity
+from .pilot import coverage, epoch_order, record_identity, run_limits
 
 
 def versions():
@@ -125,12 +125,15 @@ def execute(directory, checkpoints, emit):
     pilot = config.get('trainingKind') == 'pilot'
     filename = 'train.jsonl' if pilot else 'subset.jsonl'
     records = [json.loads(line) for line in (directory/filename).read_text().splitlines()]
-    if not records or len(records) > (256 if pilot else 2):
+    block_limit, step_limit = run_limits(config.get('profile'))
+    if not records or len(records) > (block_limit if pilot else 2):
         raise ValueError('Training block count exceeds the selected mode limit.')
     if pilot and (len(records) != config['trainingBlocks'] or record_identity(records) != config['recordsSha256']
-                  or config['maxSteps'] != len(records) * config['epochs'] or config['device'] != 'cpu' or config['maxSteps'] > 2000):
-        raise ValueError('Pilot source, total epochs or CPU configuration is inconsistent.')
-    targets = [validate_record(r, config['vocabSize'], config['contextLength']) for r in records]
+                  or config['maxSteps'] != len(records) * config['epochs'] or config['maxSteps'] > step_limit or config['device'] != request['device']):
+        raise ValueError('Pilot source, total epochs or device configuration is inconsistent.')
+    validation_path = directory/'validation.jsonl'
+    validation = [json.loads(line) for line in validation_path.read_text().splitlines()] if validation_path.is_file() else []
+    targets = [validate_record(r, config['vocabSize'], config['contextLength'], config.get('objective') == 'sft') for r in records]
     device = request['device']
     if device not in ('cpu', 'cuda'):
         raise ValueError('Unsupported training device.')
@@ -152,13 +155,16 @@ def execute(directory, checkpoints, emit):
         model, optimizer, state = load_checkpoint(Path(request['resumePath']), config, identity, device)
         start_step, initial_loss = state['step'], state['initialLoss']
         if pilot:
-            expected = coverage(start_step, records, config['seed'], config['recordsSha256'])
+            expected = coverage(start_step, records, config['seed'], config['recordsSha256'], targets=targets)
             if state.get('checkpointVersion') != 2 or state.get('trainingKind') != 'pilot' or state.get('coverage') != expected:
                 raise ValueError('Checkpoint pilot order/coverage differs from this run.')
         elif state.get('subsetSize') != len(records) or state.get('subsetCursor') != start_step % len(records):
             raise ValueError('Checkpoint subset size/cursor differs from this run.')
     else:
-        model = new_model(config).to(device)
+        if initial_path := request.get('initialPath'):
+            model = GPT2LMHeadModel.from_pretrained(initial_path, local_files_only=True, attn_implementation='eager').to(device)
+        else:
+            model = new_model(config).to(device)
         optimizer = torch.optim.AdamW(model.parameters(), lr=config['learningRate'], weight_decay=0)
         start_step = 0
         initial_loss = evaluate(model, records, device)
@@ -169,29 +175,40 @@ def execute(directory, checkpoints, emit):
     measured = sum(p.numel() for p in model.parameters())
     if measured != config['estimatedParameters']:
         raise ValueError('Measured model size differs from validated configuration.')
-    initial_coverage = coverage(start_step, records, config['seed'], config['recordsSha256']) if pilot else {}
+    initial_coverage = coverage(start_step, records, config['seed'], config['recordsSha256'], targets=targets) if pilot else {}
     emit({'stage': 'training', **{k: v for k, v in initial_coverage.items() if k not in ('order', 'recordsSha256', 'nextOffset')}, 'step': start_step, 'maxSteps': config['maxSteps'], 'initialLoss': initial_loss,
           'startLoss': resumed_start_loss, 'parameters': measured, 'device': device})
     last_checkpoint = None
+    validation_history = []
+    current_epoch = None
     for index in range(start_step, config['maxSteps']):
         if time.monotonic() - started > config['timeLimitSeconds']:
             raise ValueError('Training time limit exceeded; lower epochs or model size.')
         if device == 'cuda': torch.cuda.synchronize()
         tick = time.monotonic()
         epoch, offset = divmod(index, len(records))
-        position = epoch_order(len(records), config['seed'], epoch)[offset] if pilot else offset
+        position = offset
+        if pilot:
+            if epoch != current_epoch:
+                order = epoch_order(len(records), config['seed'], epoch)
+                current_epoch = epoch
+            position = order[offset]
         loss, gradient_norm = step_model(model, optimizer, records[position], device)
         if device == 'cuda': torch.cuda.synchronize()
         duration = time.monotonic() - tick
         step = index + 1
-        progress = coverage(step, records, config['seed'], config['recordsSha256']) if pilot else None
+        progress = coverage(step, records, config['seed'], config['recordsSha256'], targets=targets) if pilot else None
         live_coverage = {k: v for k, v in progress.items() if k not in ('order', 'recordsSha256', 'nextOffset')} if progress else {}
-        emit({'stage': 'training', **live_coverage, 'blockIndex': position, 'step': step, 'maxSteps': config['maxSteps'], 'loss': loss,
+        save_now = step in config['checkpointSteps'] if pilot else step % config['checkpointEvery'] == 0 or step == config['maxSteps']
+        validation_metrics = {}
+        if save_now and validation:
+            validation_metrics = {'validationLoss': evaluate(model, validation, device), 'validationBlocks': len(validation)}
+            validation_history.append({'step': step, **validation_metrics})
+        emit({'stage': 'training', **live_coverage, **validation_metrics, 'blockIndex': position, 'step': step, 'maxSteps': config['maxSteps'], 'loss': loss,
               'gradientNorm': gradient_norm, 'stepSeconds': duration, 'targetTokensPerSecond': targets[position]/duration,
               'rssBytes': psutil.Process().memory_info().rss,
               'cudaPeakAllocatedBytes': torch.cuda.max_memory_allocated() if device == 'cuda' else None,
               'cudaPeakReservedBytes': torch.cuda.max_memory_reserved() if device == 'cuda' else None})
-        save_now = step in config['checkpointSteps'] if pilot else step % config['checkpointEvery'] == 0 or step == config['maxSteps']
         if save_now:
             last_checkpoint = save_checkpoint(model, optimizer, checkpoints, step, config, identity, device, initial_loss, len(records), progress)
         if sum(p.stat().st_size for p in checkpoints.rglob('*') if p.is_file()) > 1024**3:
@@ -213,7 +230,9 @@ def execute(directory, checkpoints, emit):
               'trainingSeconds': time.monotonic()-started, 'scope': 'train-subset diagnostic; no held-out evaluation'}
     if pilot:
         result.pop('subsetSequences'); result.pop('subsetTargets')
-        result.update({'trainingKind': 'pilot', 'coverage': coverage(config['maxSteps'], records, config['seed'], config['recordsSha256']),
+        result.update({'trainingKind': 'pilot', 'coverage': coverage(config['maxSteps'], records, config['seed'], config['recordsSha256'], targets=targets),
                        'scope': 'all-train diagnostic; no held-out evaluation', 'epochs': config['epochs']})
+    if validation_history:
+        result['validation'] = validation_history
     write_json(directory/'training-result.json', result)
     return result

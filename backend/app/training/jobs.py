@@ -135,6 +135,12 @@ def execute_smoke(conn, root, run, stopping):
         checkpoints.mkdir(parents=True, exist_ok=True)
         write_json(stage/'configuration.json', run['configuration'])
         write_jsonl(stage/('train.jsonl' if pilot else 'subset.jsonl'), source['trainingRecords'] if pilot else source['subset'])
+        if pilot and run['source_snapshot']['sequence']['manifest']['counts']['validation']['sequences']:
+            from ..inference.source import prepare_inputs
+            evaluation_source = {'configuration': run['configuration'], 'trainingSource': run['source_snapshot']}
+            settings = {'kind': 'evaluation', 'metricScope': 'validation', 'prompts': [], 'maxNewTokens': 0}
+            validation = prepare_inputs(root, evaluation_source, settings)['records']
+            write_jsonl(stage/'validation.jsonl', validation)
         saved = run['source_snapshot']['tokenizer']
         for key, filename in (('tokenizer','tokenizer.json'),('config','tokenizer_config.json'),('special_tokens','special_tokens_map.json')):
             shutil.copyfile(verified_artifact(root, saved, key), stage/filename)
@@ -144,7 +150,12 @@ def execute_smoke(conn, root, run, stopping):
             if not checkpoint:
                 raise DatasetError('Resume checkpoint is unavailable.')
             resume_path = str(verify_checkpoint(root, checkpoint))
-        write_json(stage/'request.json', {'device':runtime['device'], 'sourceIdentity':run['source_snapshot']['sourceIdentity'], 'resumePath':resume_path})
+        initial_path = None
+        if run['initial_checkpoint_id']:
+            checkpoint = conn.execute('SELECT * FROM smoke_checkpoints WHERE id=%s', (run['initial_checkpoint_id'],)).fetchone()
+            initial_path = str(verify_checkpoint(root, checkpoint))
+        write_json(stage/'request.json', {'device': runtime['device'], 'sourceIdentity': run['source_snapshot']['sourceIdentity'],
+                                          'resumePath': resume_path, 'initialPath': initial_path})
         wait_for_child('app.training.process', 'initializing')
         wait_for_child('app.training.verify_process', 'verifying')
         result = json.loads((stage/'training-result.json').read_text())
@@ -157,13 +168,15 @@ def execute_smoke(conn, root, run, stopping):
             raise DatasetError('Pilot did not cover every requested block/epoch.')
         verdict = None if pilot else ('passed' if result['lossDecreaseRatio'] >= 0.05 else 'needs-attention')
         report = {**result, **verification, 'verdict': verdict, 'sourceIdentity':run['source_snapshot']['sourceIdentity'],
-                  'warnings':['All-train diagnostic only; no held-out evaluation was performed.' if pilot else 'Train-subset diagnostic only; no held-out evaluation was performed.']}
+                  'warnings': (['Validation and train diagnostics are reported separately. Run independent evaluation before selecting a release.']
+                               if result.get('validation') else
+                               ['No held-out validation was available for this run.'])}
         write_json(stage/'report.json', report)
         write_json(stage/'sample.json', verification['sample'])
         if pilot:
             write_json(stage/'coverage.json', result['coverage'])
-            (stage/'USAGE.txt').write_text('Whole-dataset CPU pilot. Use this bundle tokenizer with its model.\nLoad model weights from the final checkpoints/step-* directory using GPT2LMHeadModel.from_pretrained.\nTraining loss is a diagnostic; independent evaluation is separate.\nResume requires the original immutable configuration/source and runtime.\n', encoding='utf-8')
-        for private in ('request.json','subset.jsonl','train.jsonl','reload-reference.pt','training-result.json','verification.json'):
+            (stage/'USAGE.txt').write_text('Whole-dataset training run. Use this bundle tokenizer with its model.\nLoad model weights from the final checkpoints/step-* directory using GPT2LMHeadModel.from_pretrained.\nTraining loss is a diagnostic; independent evaluation is separate.\nResume requires the original immutable configuration/source and runtime.\n', encoding='utf-8')
+        for private in ('request.json','subset.jsonl','train.jsonl','validation.jsonl','reload-reference.pt','training-result.json','verification.json'):
             (stage/private).unlink(missing_ok=True)
         artifacts = {key: describe(stage/filename) for key,filename in (('report','report.json'),('sample','sample.json'),
             ('metrics','metrics.jsonl'),('config','configuration.json'),('tokenizer','tokenizer.json'),
@@ -171,7 +184,7 @@ def execute_smoke(conn, root, run, stopping):
         if pilot:
             artifacts['coverage'] = describe(stage/'coverage.json')
         manifest = {'schemaVersion':2 if pilot else 1,'kind':'whole-dataset-pilot' if pilot else 'model-smoke-test','runId':str(run['id']), 'configuration':run['configuration'],
-            'source':{k:v for k,v in run['source_snapshot'].items() if k not in ('dataset','sequence','tokenizer')},
+            'source':{k:v for k,v in run['source_snapshot'].items() if k not in ('dataset','sequence','tokenizer','ancestorDatasets')},
             'runtime':runtime,'verdict':verdict,'report':report,'artifacts':artifacts}
         write_json(stage/'manifest.json', manifest)
         artifacts['manifest'] = describe(stage/'manifest.json')

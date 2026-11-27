@@ -19,10 +19,17 @@ def main():
     args = parser.parse_args()
     if args.offline and not args.wheelhouse:
         parser.error('--offline requires --wheelhouse')
-    interpreter = args.python or shutil.which('python3.13') or shutil.which('python3.12') or sys.executable
     environment = ROOT / '.venv-training'
     python = environment / 'bin/python'
     if not python.exists():
+        candidates = [args.python] if args.python else [shutil.which(name) for name in ('python3.13', 'python3.12')]
+        if not args.python:
+            candidates.append(sys.executable)
+        interpreter = next((candidate for candidate in candidates if candidate and subprocess.run(
+            [candidate, '-m', 'ensurepip', '--version'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        ).returncode == 0), None)
+        if interpreter is None:
+            parser.error('No selected Python interpreter has ensurepip. Install its venv package or pass --python.')
         subprocess.run([interpreter, '-m', 'venv', str(environment)], check=True)
     pip = [str(python), '-m', 'pip']
     cache = ['--find-links', args.wheelhouse] if args.wheelhouse else []

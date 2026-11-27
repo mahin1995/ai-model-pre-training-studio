@@ -35,8 +35,17 @@ class SmokeSettings(TrainingSettings):
 
 
 class PilotSettings(TrainingSettings):
-    device: Literal['cpu'] = 'cpu'
+    profile: Literal['pilot', 'full'] = 'pilot'
+    device: Literal['cpu', 'cuda'] = 'cpu'
+    timeLimitSeconds: Annotated[StrictInt, Field(ge=60, le=86_400)] = 900
     epochs: Annotated[StrictInt, Field(ge=1, le=20)] = 3
+
+
+    @model_validator(mode='after')
+    def profile_limits(self):
+        if self.profile == 'pilot' and (self.device != 'cpu' or self.timeLimitSeconds > 900):
+            raise ValueError('The pilot profile requires CPU and a time limit of at most 900 seconds.')
+        return self
 
 
 class ConfigCreate(Model):
@@ -55,6 +64,7 @@ class PilotConfigCreate(Model):
 
 class RunCreate(Model):
     modelConfigId: UUID
+    initialCheckpointId: UUID | None = None
 
 
 class ResumeCreate(Model):
@@ -84,11 +94,12 @@ def configuration(settings, vocab, context):
 
 
 def pilot_configuration(settings, vocab, context, records):
-    from ..training.pilot import PROTOCOL, checkpoint_steps, record_identity
+    from ..training.pilot import PROTOCOL, checkpoint_steps, record_identity, run_limits
     count = len(records)
     steps = count * settings['epochs']
-    if not 1 <= count <= 256 or steps > 2000:
-        raise ValueError('Pilot supports 1–256 train blocks and at most 2,000 updates; no blocks were sampled.')
+    block_limit, step_limit = run_limits(settings.get('profile'))
+    if not 1 <= count <= block_limit or steps > step_limit:
+        raise ValueError(f'This profile supports 1–{block_limit:,} train blocks and at most {step_limit:,} updates; no blocks were sampled.')
     total = parameter_count(vocab, context, settings)
     if total > 10_000_000:
         raise ValueError('Pilot models are limited to 10 million parameters.')

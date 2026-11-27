@@ -5,7 +5,7 @@ const runPath = (project: string, kind: RunKind, id: string) => `${base(project,
 export const listSources = (project: string, signal?: AbortSignal) => request<SourceVersion[]>(`${base(project, "tokenizers")}/sources`, { signal });
 export const listRuns = (project: string, kind: RunKind, signal?: AbortSignal) => request<PreparationRun[]>(base(project, kind), { signal });
 export const startTokenizer = (project: string, datasetVersionId: string, vocabSize: number) => request<PreparationRun>(base(project, "tokenizers"), { method: "POST", body: JSON.stringify({ datasetVersionId, vocabSize }) });
-export const startSequences = (project: string, tokenizerRunId: string, sequenceLength: number) => request<PreparationRun>(base(project, "sequence-runs"), { method: "POST", body: JSON.stringify({ tokenizerRunId, sequenceLength }) });
+export const startSequences = (project: string, tokenizerRunId: string, sequenceLength: number, datasetVersionId?: string, objective?: "sft") => request<PreparationRun>(base(project, "sequence-runs"), { method: "POST", body: JSON.stringify({ tokenizerRunId, sequenceLength, datasetVersionId, objective }) });
 export const cancelPreparation = (project: string, kind: RunKind, id: string) => request<PreparationRun>(`${runPath(project, kind, id)}/cancel`, { method: "POST" });
 export const retryPreparation = (project: string, kind: RunKind, id: string) => request<PreparationRun>(`${runPath(project, kind, id)}/retry`, { method: "POST" });
 export const deletePreparation = (project: string, kind: RunKind, id: string) => request<{ deleted: boolean; cleanupWarning: string | null }>(runPath(project, kind, id), { method: "DELETE" });

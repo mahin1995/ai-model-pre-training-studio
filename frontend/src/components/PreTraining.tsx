@@ -17,6 +17,7 @@ function TrainingWorkspace({ projectId, onConfig }: { projectId: string; onConfi
   const [mode, setMode] = useState<TrainingKind>("smoke");
   const [preview, setPreview] = useState<PilotPreview | null>(null);
   const [previewError, setPreviewError] = useState("");
+  const [initialCheckpointId, setInitialCheckpointId] = useState("");
   const [configId, setConfigId] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [runtime, setRuntime] = useState<Runtime | null>(null);
@@ -27,6 +28,13 @@ function TrainingWorkspace({ projectId, onConfig }: { projectId: string; onConfi
   const selected = runs.find((r) => r.id === selectedId) ?? runs[0];
   const modeConfigs = configs.filter((c) => (c.trainingKind ?? "smoke") === mode);
   const config = modeConfigs.find((c) => c.id === configId) ?? modeConfigs[0];
+  const parentChoices = config && mode === "pilot" ? runs.filter((run) =>
+    run.status === "completed" && run.configuration.vocabSize === config.configuration.vocabSize &&
+    run.configuration.contextLength === config.configuration.contextLength && run.configuration.layers === config.configuration.layers &&
+    run.configuration.hiddenSize === config.configuration.hiddenSize && run.configuration.heads === config.configuration.heads &&
+    configs.find((parentConfig) => parentConfig.id === run.modelConfigId)?.source.tokenizerRunId === config.source.tokenizerRunId,
+  ).flatMap((run) => run.checkpoints.map((checkpoint) => ({ run, checkpoint }))) : [];
+  const initialCheckpoint = parentChoices.find(({ checkpoint }) => checkpoint.id === initialCheckpointId)?.checkpoint;
   const active = runs.some(smokeActive);
   const refresh = useCallback(async (signal?: AbortSignal) => {
     const [nextConfigs, nextRuns, pilots] = await Promise.all([listModelConfigs(projectId, signal), listSmokeRuns(projectId, signal), listSmokeRuns(projectId, signal, "pilot")]);
@@ -59,7 +67,7 @@ function TrainingWorkspace({ projectId, onConfig }: { projectId: string; onConfi
     if (action === "delete" && !window.confirm("Delete this run and all its checkpoints? Runs used for resume are protected.")) return;
     setBusy(true); setError(""); setNotice("");
     try {
-      if (action === "start" && config) { const next = await startSmoke(projectId, config.id, mode); setSelectedId(next.id); setNotice(`${mode === "pilot" ? "Whole-dataset pilot" : "Smoke-test"} run queued with fixed source and configuration.`); }
+      if (action === "start" && config) { const next = await startSmoke(projectId, config.id, mode, initialCheckpoint?.id); setSelectedId(next.id); setNotice(`${mode === "pilot" ? "Whole-dataset pilot" : "Smoke-test"} run queued with fixed source and configuration.`); }
       else if (selected && action === "delete") { const result = await deleteSmoke(projectId, selected.id, selected.trainingKind ?? "smoke"); setNotice(result.cleanupWarning ?? "Run deleted."); }
       else if (selected && (action === "cancel" || action === "retry" || action === "resume")) { const next = await smokeAction(projectId, selected.id, action, checkpointId, selected.trainingKind ?? "smoke"); if (action !== "cancel") setSelectedId(next.id); setNotice(action === "cancel" ? "Cancellation requested." : "New run queued. Original artifacts are preserved."); }
       await refresh();
@@ -70,15 +78,20 @@ function TrainingWorkspace({ projectId, onConfig }: { projectId: string; onConfi
   return <div className="training-page">
     {error && <div className="error-banner" role="alert">{error}</div>}{notice && <p className="notice" role="status">{notice}</p>}
     <TrainingRuntime projectId={projectId} onReport={setRuntime}/>
-    <section className="card training-form"><span className="eyebrow">BOUNDED PRE-TRAINING</span><h2>{mode === "pilot" ? "Train on every selected training block." : "Run a small, measurable training check."}</h2><label>Run mode<select aria-label="Run mode" value={mode} disabled={busy} onChange={(e) => { setMode(e.target.value as TrainingKind); setConfigId(""); }}><option value="smoke">Smoke test</option><option value="pilot">Whole-dataset pilot</option></select></label><p>{mode === "pilot" ? "Start with random weights, visit all blocks each epoch and measure coverage. Independent evaluation is separate." : "Train on up to two training blocks to check numerical stability and checkpoints."}</p>
+    <section className="card training-form"><span className="eyebrow">BOUNDED PRE-TRAINING</span><h2>{mode === "pilot" ? "Train on every selected training block." : "Run a small, measurable training check."}</h2><label>Run mode<select aria-label="Run mode" value={mode} disabled={busy} onChange={(e) => { setMode(e.target.value as TrainingKind); setConfigId(""); }}><option value="smoke">Smoke test</option><option value="pilot">Whole-dataset pilot</option></select></label><p>{mode === "pilot" ? "Visit all blocks each epoch and measure coverage. Independent evaluation is separate." : "Train on up to two training blocks to check numerical stability and checkpoints."}</p>
       <label>Saved model configuration<select aria-label="Saved model configuration" disabled={busy || loading} value={config?.id ?? ""} onChange={(e) => setConfigId(e.target.value)}><option value="">Choose a saved configuration</option>{modeConfigs.map((c) => <option key={c.id} value={c.id}>{c.name} · revision {c.revision} · {c.configuration.maxSteps} steps</option>)}</select></label>
+      {mode === "pilot" && <label>Initialize weights<select value={initialCheckpoint?.id ?? ""} disabled={busy} onChange={(e) => setInitialCheckpointId(e.target.value)}>
+        <option value="">{config?.configuration.objective === "sft" ? "Choose a parent checkpoint" : "Random weights"}</option>
+        {parentChoices.map(({ run, checkpoint }) =>
+          <option key={checkpoint.id} value={checkpoint.id}>{run.trainingKind === "pilot" ? "Pilot" : "Smoke"} · step {checkpoint.step} · {new Date(run.createdAt).toLocaleString()}</option>)}
+      </select></label>}
       {config && <p className="dataset-caption">{config.source.datasetName} v{config.source.datasetVersion} · {config.configuration.vocabSize.toLocaleString()} vocabulary · {config.configuration.contextLength} context · {config.configuration.device} / FP32 · {config.configuration.timeLimitSeconds}s time limit</p>}
-      {mode === "pilot" && (preview?.modelConfigId === config?.id && preview ? <div className="info-note pilot-preview" aria-label="Pilot execution plan"><p>{preview.trainingBlocks} training blocks · {preview.trainingDocuments} documents · {preview.epochs} epochs · {preview.totalSteps} updates</p><p>{preview.targetTokensPerEpoch.toLocaleString()} supervised targets per epoch · checkpoints at steps {preview.checkpointSteps.join(", ")}</p><p>Estimated artifacts: {(preview.estimatedStorageBytes/1024**2).toFixed(1)} MiB · CPU / FP32 · {preview.timeLimitSeconds}s limit</p>{preview.warnings.map((w) => <p key={w}>{w}</p>)}</div> : <p role={previewError ? "alert" : "status"}>{previewError || (config ? "Validating complete pilot plan…" : "Save a pilot configuration in Model Config first.")}</p>)}
-      <div className="training-actions"><button className="primary" disabled={busy || loading || !config || !deviceReady || (mode === "pilot" && preview?.modelConfigId !== config.id)} onClick={() => void command("start")}>{mode === "pilot" ? "Start pilot" : "Run smoke test"}</button><button className="secondary" onClick={onConfig}>Model configuration</button><button className="text-button" disabled={busy || loading} onClick={() => { void refresh().catch((e: unknown) => setError(e instanceof Error ? e.message : "Refresh failed.")); }}>Refresh runs</button></div>
+      {mode === "pilot" && (preview?.modelConfigId === config?.id && preview ? <div className="info-note pilot-preview" aria-label="Pilot execution plan"><p>{preview.trainingBlocks} training blocks · {preview.trainingDocuments} documents · {preview.epochs} epochs · {preview.totalSteps} updates</p><p>{preview.targetTokensPerEpoch.toLocaleString()} supervised targets per epoch · checkpoints at steps {preview.checkpointSteps.join(", ")}</p><p>Estimated artifacts: {(preview.estimatedStorageBytes/1024**2).toFixed(1)} MiB · {config.configuration.device.toUpperCase()} / FP32 · {preview.timeLimitSeconds}s limit</p>{preview.warnings.map((w) => <p key={w}>{w}</p>)}</div> : <p role={previewError ? "alert" : "status"}>{previewError || (config ? "Validating complete pilot plan…" : "Save a pilot configuration in Model Config first.")}</p>)}
+      <div className="training-actions"><button className="primary" disabled={busy || loading || !config || !deviceReady || (mode === "pilot" && preview?.modelConfigId !== config.id) || (config.configuration.objective === "sft" && !initialCheckpoint)} onClick={() => void command("start")}>{mode === "pilot" ? "Start pilot" : "Run smoke test"}</button><button className="secondary" onClick={onConfig}>Model configuration</button><button className="text-button" disabled={busy || loading} onClick={() => { void refresh().catch((e: unknown) => setError(e instanceof Error ? e.message : "Refresh failed.")); }}>Refresh runs</button></div>
       {!runtime && <p className="dataset-caption">Check the training runtime above before starting.</p>}
     </section>
     {loading ? <p role="status">Loading training history…</p> : !runs.length ? <section className="empty-card"><FlaskConical size={36}/><h2>No training runs yet.</h2><p>Save a configuration, check the executor and start a bounded run.</p></section> : <>
-      <div className="tokenizer-run-list">{runs.map((r) => <button className={`card tokenizer-run-choice ${selected?.id === r.id ? "selected" : ""}`} aria-pressed={selected?.id === r.id} key={r.id} onClick={() => setSelectedId(r.id)}><strong>{r.trainingKind === "pilot" ? (r.parentRunId ? "Resumed pilot" : "Whole-dataset pilot") : (r.parentRunId ? "Resume verification" : "Smoke test")} · {r.status}</strong><span>{r.verdict ?? `${r.metrics.step ?? 0} / ${r.configuration.maxSteps} steps`}</span><small>{new Date(r.createdAt).toLocaleString()}</small></button>)}</div>
+      <div className="tokenizer-run-list">{runs.map((r) => <button className={`card tokenizer-run-choice ${selected?.id === r.id ? "selected" : ""}`} aria-pressed={selected?.id === r.id} key={r.id} onClick={() => setSelectedId(r.id)}><strong>{r.trainingKind === "pilot" ? (r.configuration.objective === "sft" ? "SFT pilot" : r.initialCheckpointId ? "Mid-training pilot" : r.parentRunId ? "Resumed pilot" : "Whole-dataset pilot") : (r.parentRunId ? "Resume verification" : "Smoke test")} · {r.status}</strong><span>{r.verdict ?? `${r.metrics.step ?? 0} / ${r.configuration.maxSteps} steps`}</span><small>{new Date(r.createdAt).toLocaleString()}</small></button>)}</div>
       {selected && <RunDetails key={selected.id} projectId={projectId} run={selected} busy={busy} onAction={(a, cp) => void command(a, cp)}/>}
     </>}
   </div>;
@@ -121,6 +134,10 @@ function RunDetails({ projectId, run, busy, onAction }: { projectId: string; run
     </>}
     <div className="training-checkpoints"><h3>Verified checkpoints</h3>{!run.checkpoints.length && <p>{pilot ? "Checkpoints appear at the planned epoch boundaries and completion." : "Checkpoints appear after every 50 optimizer steps and at completion."}</p>}
       {run.checkpoints.map((c) => <div className="training-checkpoint" key={c.id}><a className="secondary" href={checkpointDownload(projectId, run.id, c.id, run.trainingKind ?? "smoke")}>Download step {c.step}</a><code>{c.sha256}</code></div>)}
+      {run.manifest?.report.validation && <div>
+        <h4>Validation loss by checkpoint</h4>
+        <ul>{run.manifest.report.validation.map((value) => <li key={value.step}>Step {value.step} · loss {value.validationLoss.toFixed(4)} · {value.validationBlocks} blocks</li>)}</ul>
+      </div>}
       {(run.status === "completed" || (pilot && ["failed", "cancelled"].includes(run.status))) && <div className="training-actions"><label>Resume checkpoint<select aria-label="Resume checkpoint" value={checkpoint?.id ?? ""} disabled={!intermediate.length} onChange={(e) => setCheckpointId(e.target.value)}>{!intermediate.length && <option value="">No intermediate checkpoint</option>}{intermediate.map((c) => <option key={c.id} value={c.id}>Step {c.step} → {run.configuration.maxSteps}</option>)}</select></label><button className="secondary" disabled={busy || !checkpoint} onClick={() => onAction("resume", checkpoint?.id)}>{pilot ? "Resume pilot" : "Resume verification"}</button></div>}
     </div>
   </section>;

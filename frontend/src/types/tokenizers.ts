@@ -7,7 +7,7 @@ export type PreparationManifest = {
   actualVocabSize?: number; requestedVocabSize?: number; trainingDocuments?: number; trainingBytes?: number;
   trainingTokens?: number; trainingSeconds?: number; specialIds?: Record<string, number>;
   counts?: Record<SplitName, SequenceCounts>; contentTokens?: number; sequenceLength?: number; warnings?: string[];
-  labelsPolicy?: string; tokenizerSha256?: string;
+  objective?: "sft"; templateVersion?: string; labelsPolicy?: string; tokenizerSha256?: string;
 };
 export type PreparationRun = {
   id: string; projectId: string; datasetId: string; datasetVersionId: string; datasetVersion: number; datasetName: string;

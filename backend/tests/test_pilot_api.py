@@ -289,3 +289,130 @@ def test_native_pilot_cancel_and_timeout(pilot_workspace, test_database, monkeyp
     timed = client.get(base + '/pilot-runs/' + response.json()['id']).json()
     assert timed['status'] == 'failed' and 'time limit' in timed['error']
     assert children[-1].poll() is not None
+
+
+def test_checkpoint_initialization_and_sft_playground(pilot_workspace, test_database, tmp_path):
+    from test_dataset_corrections import META
+
+    client, data = pilot_workspace
+    base = data['base']
+    configuration = {'hiddenSize': 64, 'epochs': 1, 'prompt': 'A short source', 'profile': 'full'}
+    config = client.post(base + '/model-configs', json={
+        'trainingKind': 'pilot', 'sequenceRunId': data['sequence']['id'], 'settings': configuration,
+    }).json()
+
+    def complete_run(model_id, parent=None):
+        payload = {'modelConfigId': model_id}
+        if parent:
+            payload['initialCheckpointId'] = parent
+        response = client.post(base + '/pilot-runs', json=payload)
+        assert response.status_code == 202, response.text
+        run_training(client, test_database)
+        run = client.get(f"{base}/pilot-runs/{response.json()['id']}").json()
+        assert run['status'] == 'completed', run['error']
+        return run
+
+    original = complete_run(config['id'])
+    original_checkpoint = original['checkpoints'][-1]['id']
+    mid = complete_run(config['id'], original_checkpoint)
+    assert mid['initialCheckpointId'] == original_checkpoint
+    assert mid['parentRunId'] == original['id']
+    assert mid['manifest']['report']['startingStep'] == 0
+    assert mid['manifest']['report']['initialLoss'] == pytest.approx(original['manifest']['report']['finalLoss'], abs=1e-7)
+    assert client.delete(f"{base}/pilot-runs/{original['id']}").status_code == 409
+
+    examples = [
+        {'question': f'Rule {i}?', 'excerpt': f'Rule {i} applies.', 'answer': 'It applies.'}
+        for i in range(3)
+    ]
+    raw = '\n'.join(json.dumps({'text': json.dumps(example)}) for example in examples).encode()
+    imported = client.post(base + '/datasets', data={'metadata': json.dumps({**META, 'name': 'Reviewed QA'})},
+                           files=[('files', ('qa.jsonl', raw))])
+    assert imported.status_code == 201, imported.text
+    path = base + '/datasets/' + imported.json()['id']
+    assert client.post(path + '/process', json={'train': 100, 'validation': 0, 'test': 0}).status_code == 202
+    run_job(client, test_database)
+    revision_url, revision = save_all(client, path, client.get(path).json()['versions'][0])
+    assert client.post(revision_url + '/publish', json={'revision': revision}).status_code == 202
+    run_job(client, test_database)
+    sft_version = client.get(path).json()['versions'][0]
+    response = client.post(base + '/sequence-runs', json={
+        'tokenizerRunId': data['tokenizer']['id'], 'datasetVersionId': sft_version['id'],
+        'sequenceLength': 128, 'objective': 'sft',
+    })
+    assert response.status_code == 202, response.text
+    execute(client, test_database)
+    sft_config = client.post(base + '/model-configs', json={
+        'trainingKind': 'pilot', 'sequenceRunId': response.json()['id'], 'settings': configuration,
+    })
+    assert sft_config.status_code == 201, sft_config.text
+    for parent in (original_checkpoint, mid['checkpoints'][-1]['id']):
+        fitted = complete_run(sft_config.json()['id'], parent)
+        assert fitted['configuration']['templateVersion'] == 'source-qa-v1'
+        assert fitted['manifest']['report']['finiteGradients']
+        generation = client.post(base + '/generation-runs', json={
+            'checkpointId': fitted['checkpoints'][-1]['id'], 'prompt': 'Rule 1?', 'excerpt': 'Rule 1 applies.',
+            'maxNewTokens': 8,
+        })
+        assert generation.status_code == 202, generation.text
+        run_inference(client, test_database)
+        generated = client.get(f"{base}/generation-runs/{generation.json()['id']}").json()
+        assert generated['status'] == 'completed', generated['error']
+        assert generated['settings']['prompts'][0]['text'] == 'Source: "Rule 1 applies."\nQuestion: "Rule 1?"\nAnswer:\n'
+
+    response = client.get(f"{base}/pilot-runs/{fitted['id']}/download")
+    assert response.status_code == 200, response.text
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        archive.extractall(tmp_path)
+    root = Path(__file__).resolve().parents[2]
+    restored = subprocess.run([str(root / '.venv-training/bin/python'), '-m', 'app.inference.local', str(tmp_path),
+        '--prompt', 'Rule 1?', '--excerpt', 'Rule 1 applies.', '--max-new-tokens', '8'],
+        cwd=root / 'backend', capture_output=True, text=True, timeout=30)
+    assert restored.returncode == 0, restored.stderr
+    local_result = json.loads(restored.stdout)
+    assert local_result['newTokenIds'] == generated['manifest']['report']['results'][0]['generations'][0]['newTokenIds']
+
+    raw = '\n'.join(json.dumps({'text': json.dumps({
+        'question': f'Fixture rule {i}?', 'excerpt': f'Independent fixture {i}.', 'answer': f'Fixture {i}.',
+    }), 'group_id': f'independent-{i}'}) for i in range(3)).encode()
+    external = client.post(base + '/datasets', data={'metadata': json.dumps({**META, 'name': 'Final fixture'})},
+                           files=[('files', ('final-fixture.jsonl', raw))])
+    assert external.status_code == 201, external.text
+    path = base + '/datasets/' + external.json()['id']
+    assert client.post(path + '/process', json={}).status_code == 202
+    run_job(client, test_database)
+    correction, revision = save_all(client, path, client.get(path).json()['versions'][0])
+    assert client.post(correction + '/publish', json={'revision': revision}).status_code == 202
+    run_job(client, test_database)
+    final_version = client.get(path).json()['versions'][0]
+    prompts = client.post(base + '/prompt-sets', json={
+        'name': 'Final fixture prompts', 'prompts': [{'text': 'Source: "Independent fixture."\nQuestion: "Rule?"\nAnswer:\n'}],
+    }).json()
+    evaluation = client.post(base + '/evaluation-runs', json={
+        'checkpointIds': [original_checkpoint, fitted['checkpoints'][-1]['id']], 'promptSetVersionId': prompts['id'],
+        'maxNewTokens': 8, 'metricScope': 'final-test', 'externalDatasetVersionId': final_version['id'],
+    })
+    assert evaluation.status_code == 202, evaluation.text
+    run_inference(client, test_database)
+    comparison = client.get(f"{base}/evaluation-runs/{evaluation.json()['id']}").json()
+    assert comparison['status'] == 'completed', comparison['error']
+    report = comparison['manifest']['report']
+    assert {item['trainingRunId'] for item in report['results']} == {original['id'], fitted['id']}
+    assert all(item['metrics']['heldOutAvailable'] for item in report['results'])
+    evaluation_path = tmp_path / 'evaluation.json'
+    evaluation_path.write_text(json.dumps(report))
+    card = tmp_path / 'card.md'
+    card.write_text('Fixture model for local code verification.')
+    release = tmp_path / 'release.zip'
+    packaged = subprocess.run([str(root / '.venv-training/bin/python'), '-m', 'app.inference.release',
+        str(tmp_path), str(evaluation_path), str(card), str(release)],
+        cwd=root / 'backend', capture_output=True, text=True, timeout=30)
+    assert packaged.returncode == 0, packaged.stderr
+    restored_path = tmp_path / 'release'
+    with zipfile.ZipFile(release) as archive:
+        archive.extractall(restored_path)
+    restored = subprocess.run([str(root / '.venv-training/bin/python'), '-m', 'app.inference.local', str(restored_path),
+        '--prompt', 'Rule 1?', '--excerpt', 'Rule 1 applies.', '--max-new-tokens', '8'],
+        cwd=root / 'backend', capture_output=True, text=True, timeout=30)
+    assert restored.returncode == 0, restored.stderr
+    assert json.loads(restored.stdout)['newTokenIds'] == local_result['newTokenIds']

@@ -37,8 +37,8 @@ def recover_inference(conn,root):
 def compatible_runtime(snapshot,runtime):
     for cp in snapshot['checkpoints']:
         saved=cp['manifest']['checkpoint']
-        if saved['device']!='cpu' or saved['versions']!=runtime['versions']:
-            raise DatasetError('Inference requires a CPU-trained checkpoint and its pinned runtime versions. Recheck the training environment.')
+        if saved['versions']!=runtime['versions']:
+            raise DatasetError('Inference requires the pinned runtime versions used to train the checkpoint. Recheck the training environment.')
 
 
 def execute_inference(conn,root,run,stopping):
@@ -66,6 +66,8 @@ def execute_inference(conn,root,run,stopping):
         check_resources(root);heartbeat('validating')
         snapshot=run['source_snapshot']
         current_permission(conn,snapshot['trainingSource'])
+        for source in snapshot.get('comparisonSources', ()):
+            current_permission(conn, source)
         if snapshot.get('externalSource'):current_permission(conn,snapshot['externalSource'])
         prepared=prepare_inputs(root,snapshot,run['settings']);heartbeat()
         runtime=select_runtime({'device':'cpu'},force=True,heartbeat=heartbeat)
@@ -80,7 +82,7 @@ def execute_inference(conn,root,run,stopping):
             # No optimizer/RNG tensor state is copied or loaded for inference.
             for name in ('config.json','model.safetensors','generation_config.json'):
                 if (verified/name).is_file():shutil.copyfile(verified/name,target/name)
-            checkpoints.append({'id':cp['id'],'step':cp['step']})
+            checkpoints.append({'id':cp['id'],'step':cp['step'],'trainingRunId':cp.get('trainingRunId', snapshot['trainingRunId'])})
         write_jsonl(stage/'records.jsonl',prepared['records']);write_jsonl(stage/'subset.jsonl',prepared['subsetRecords'])
         write_json(stage/'request.json',{'configuration':snapshot['configuration'],'settings':run['settings'],
             'checkpoints':checkpoints,'runtime':runtime,'heldOutAvailable':prepared['heldOutAvailable'],'warnings':prepared['warnings']})
@@ -107,7 +109,7 @@ def execute_inference(conn,root,run,stopping):
             'source':{**{k:snapshot['trainingSource'][k] for k in ('datasetId','datasetVersionId','datasetVersion','datasetName','sequenceRunId','tokenizerRunId','sourceIdentity')},
                       'datasetManifestSha256':snapshot['trainingSource']['dataset']['manifestSha256']},
             'checkpoints':[{'id':c['id'],'step':c['step'],'modelSha256':c['manifest']['checkpoint']['files']['model.safetensors']['sha256'],
-                           'checkpointManifestSha256':c['manifest']['descriptor']['sha256']} for c in snapshot['checkpoints']],
+                           'trainingRunId':c.get('trainingRunId', snapshot['trainingRunId']), 'checkpointManifestSha256':c['manifest']['descriptor']['sha256']} for c in snapshot['checkpoints']],
             'evaluationSource':{'datasetVersionId':snapshot['externalSource']['datasetVersionId'],'manifestSha256':snapshot['externalSource']['manifestSha256']} if snapshot.get('externalSource') else None,
             'settings':run['settings'],'runtime':runtime,'report':report,'artifacts':artifacts}
         write_json(stage/'manifest.json',manifest);artifacts['manifest']=describe(stage/'manifest.json')
